@@ -736,7 +736,6 @@ async function executeStatusChange() {
     pendingStatusChange = null;
   }
 }
-}
 
 // ユーティリティ関数
 function escapeHtml(text) {
