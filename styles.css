@@ -1,0 +1,225 @@
+/* 基本スタイル */
+body {
+  background-color: #f8f9fa;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ログイン画面 */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f0f0f0;
+}
+
+.login-box {
+  background: white;
+  padding: 40px;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+/* サイドバー */
+.sidebar {
+  min-height: 100vh;
+  background-color: #212529;
+  color: white;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 16.666667%;
+  z-index: 100;
+}
+
+.sidebar a {
+  color: #adb5bd;
+  text-decoration: none;
+  padding: 10px 15px;
+  display: block;
+  transition: all 0.3s ease;
+}
+
+.sidebar a:hover, .sidebar a.active {
+  color: white;
+  background-color: #495057;
+}
+
+.sidebar h5 {
+  color: white;
+  margin-bottom: 20px;
+}
+
+/* メインコンテンツ */
+.content-area {
+  padding: 20px;
+  margin-left: 16.666667%;
+}
+
+/* 統計カード */
+.stat-card {
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease-in-out;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+
+.stat-card .card-title {
+  color: #6c757d;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.stat-card h2 {
+  font-weight: 700;
+  margin-bottom: 0;
+}
+
+/* テーブルコンテナ */
+.table-container {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.table {
+  margin-bottom: 0;
+}
+
+.table th {
+  border-top: none;
+  font-weight: 600;
+  color: #495057;
+  background-color: #f8f9fa;
+}
+
+/* ローディング */
+.loading {
+  display: none;
+  text-align: center;
+  padding: 50px;
+}
+
+.loading p {
+  margin-top: 20px;
+  color: #6c757d;
+}
+
+/* エラーメッセージ */
+.error-message {
+  display: none;
+  color: #dc3545;
+  text-align: center;
+  padding: 20px;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+/* バッジ */
+.badge {
+  font-weight: 500;
+  padding: 5px 10px;
+}
+
+/* モーダル */
+.modal-content {
+  border: none;
+  border-radius: 10px;
+}
+
+.modal-header {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.modal-footer {
+  border-top: 1px solid #e9ecef;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    position: static;
+    min-height: auto;
+  }
+  
+  .content-area {
+    margin-left: 0;
+  }
+  
+  .stat-card {
+    margin-bottom: 15px;
+  }
+  
+  .table-container {
+    overflow-x: auto;
+  }
+}
+
+/* ボタンのカスタマイズ */
+.btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+  border-color: #0056b3;
+}
+
+.btn-danger {
+  font-weight: 500;
+}
+
+/* セレクトボックス */
+.form-select-sm {
+  padding: 0.25rem 2rem 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* セクション */
+.section {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* カスタムスクロールバー */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
