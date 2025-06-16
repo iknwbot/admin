@@ -8,9 +8,10 @@ let allUsers = [];
 let allSites = [];
 
 // 初期化
-window.onload = function() {
+window.onload = async function() {
   checkAuth();
   initializeFilters();
+  await initializeSiteFilter();
 };
 
 // フィルター初期化
@@ -286,7 +287,7 @@ function filterReports() {
         <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
         <td>${escapeHtml(report.eventType)}</td>
         <td>大人:${report.adults} 子:${report.children}</td>
-        <td>${report.amount ? report.amount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '-'}</td>
+        <td>${report.amount ? '¥' + report.amount.toLocaleString() : '-'}</td>
         <td>
           <span class="status-badge ${getStatusClass(report.processingFlag)} clickable" 
                 onclick="showStatusChangeModal(${index})" 
@@ -308,7 +309,7 @@ function filterReports() {
 }
 
 // 報告詳細表示
-function showReportDetails(index) {
+window.showReportDetails = function(index) {
   const report = allReports[index];
   if (!report) return;
   
@@ -327,7 +328,7 @@ function showReportDetails(index) {
         <h6>参加者・金額</h6>
         <p><strong>大人:</strong> ${report.adults}人</p>
         <p><strong>子ども:</strong> ${report.children}人</p>
-        <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '未確定'}</p>
+        <p><strong>請求額:</strong> ${report.amount ? '¥' + report.amount.toLocaleString() : '未確定'}</p>
         <p><strong>ステータス:</strong> ${escapeHtml(report.processingFlag || '投稿まち')}</p>
       </div>
     </div>
@@ -446,7 +447,7 @@ async function loadMoneyDonations() {
             <td>${escapeHtml(donation.siteName)}</td>
             <td>${escapeHtml(donation.nickname || donation.userId)}</td>
             <td>${escapeHtml(donation.donor || '-')}</td>
-            <td>${donation.amount ? parseInt(donation.amount).toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '-'}</td>
+            <td>${donation.amount ? '¥' + parseInt(donation.amount).toLocaleString() : '-'}</td>
             <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
           </tr>
         `).join('');
@@ -650,7 +651,7 @@ function showStatusChangeModal(reportIndex) {
           <tr><th>投稿者</th><td>${escapeHtml(report.nickname || report.userId)}</td></tr>
           <tr><th>開催日</th><td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td></tr>
           <tr><th>開催タイプ</th><td>${escapeHtml(report.eventType)}</td></tr>
-          <tr><th>金額</th><td>${report.amount ? report.amount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '金額未確定'}</td></tr>
+          <tr><th>金額</th><td>${report.amount ? '¥' + report.amount.toLocaleString() : '金額未確定'}</td></tr>
         </table>
       </div>
     </div>
@@ -786,7 +787,7 @@ setInterval(() => {
 }, 60000); // 1分ごとにチェック
 
 // 拠点フィルター初期化
-function initializeSiteFilter() {
+async function initializeSiteFilter() {
   const siteFilter = document.getElementById('siteFilter');
   if (!siteFilter) return;
   
@@ -795,19 +796,34 @@ function initializeSiteFilter() {
     siteFilter.remove(1);
   }
   
-  // 重複を除いた拠点名を取得
-  const sites = [...new Set(allReports.map(report => report.siteName))].sort();
-  
-  sites.forEach(site => {
-    const option = document.createElement('option');
-    option.value = site;
-    option.textContent = site;
-    siteFilter.appendChild(option);
-  });
+  try {
+    // Google Sheetsのsiteシートから取得
+    const result = await apiRequest('getSite?userId=admin');
+    if (result.success && result.data) {
+      const sites = result.data.map(site => site['拠点名'] || site.siteName || site.name).filter(Boolean).sort();
+      
+      sites.forEach(site => {
+        const option = document.createElement('option');
+        option.value = site;
+        option.textContent = site;
+        siteFilter.appendChild(option);
+      });
+    }
+  } catch (error) {
+    console.error('拠点リスト取得エラー:', error);
+    // フォールバック: レポートデータから取得
+    const sites = [...new Set(allReports.map(report => report.siteName))].sort();
+    sites.forEach(site => {
+      const option = document.createElement('option');
+      option.value = site;
+      option.textContent = site;
+      siteFilter.appendChild(option);
+    });
+  }
 }
 
 // ソート関数
-function sortReports(column) {
+window.sortReports = function(column) {
   if (sortColumn === column) {
     sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
   } else {
@@ -917,7 +933,7 @@ function updateMoneyDonationStatistics(donations) {
   };
   
   if (elements.totalAmount) {
-    elements.totalAmount.textContent = totalAmount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' });
+    elements.totalAmount.textContent = '¥' + totalAmount.toLocaleString();
   } else {
     console.error('totalMoneyAmount要素が見つかりません');
   }
@@ -929,7 +945,7 @@ function updateMoneyDonationStatistics(donations) {
   }
   
   if (elements.currentAmount) {
-    elements.currentAmount.textContent = currentMonthAmount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' });
+    elements.currentAmount.textContent = '¥' + currentMonthAmount.toLocaleString();
   } else {
     console.error('currentMonthMoneyAmount要素が見つかりません');
   }
