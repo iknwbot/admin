@@ -20,12 +20,12 @@ window.onload = async function() {
 
 // フィルター初期化
 function initializeFilters() {
-  initializeMonthFilter('monthFilter', filterReports);
+  initializeMonthFilter('monthFilter', null); // 自動更新を無効化
   initializeMonthFilter('foodMonthFilter', filterFoodDonations);
   initializeMonthFilter('moneyMonthFilter', filterMoneyDonations);
   
-  // フィルター変更時のイベント
-  document.getElementById('statusFilter').addEventListener('change', filterReports);
+  // フィルターの自動更新を無効化（手動検索に変更）
+  // document.getElementById('statusFilter').addEventListener('change', filterReports);
 }
 
 function initializeMonthFilter(filterId, filterFunction) {
@@ -47,7 +47,9 @@ function initializeMonthFilter(filterId, filterFunction) {
     monthFilter.appendChild(option);
   }
   
-  monthFilter.addEventListener('change', filterFunction);
+  if (filterFunction) {
+    monthFilter.addEventListener('change', filterFunction);
+  }
 }
 
 // 認証チェック
@@ -275,6 +277,22 @@ async function loadReports() {
   }
 }
 
+// フィルター適用関数（手動検索用）
+window.applyFilters = function() {
+  filterReports();
+}
+
+// フィルタークリア関数
+window.clearFilters = function() {
+  document.getElementById('monthFilter').value = '';
+  document.getElementById('statusFilter').value = '';
+  const siteFilter = document.getElementById('siteFilter');
+  if (siteFilter) {
+    siteFilter.value = '';
+  }
+  filterReports();
+}
+
 // フィルター適用
 function filterReports() {
   const monthFilter = document.getElementById('monthFilter').value;
@@ -326,7 +344,7 @@ function filterReports() {
         <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
         <td>${escapeHtml(report.eventType)}</td>
         <td>大人:${report.adults} 子:${report.children}</td>
-        <td>${report.amount ? report.amount.toLocaleString() + '円' : '-'}</td>
+        <td>${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
         <td>
           <span class="status-badge ${getStatusClass(report.processingFlag)} clickable" 
                 onclick="showStatusChangeModal(${index})" 
@@ -367,7 +385,7 @@ window.showReportDetails = function(index) {
         <h6>参加者・金額</h6>
         <p><strong>大人:</strong> ${report.adults}人</p>
         <p><strong>子ども:</strong> ${report.children}人</p>
-        <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString() + '円' : '未確定'}</p>
+        <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '未確定'}</p>
         <p><strong>ステータス:</strong> ${escapeHtml(report.processingFlag || '投稿まち')}</p>
       </div>
     </div>
@@ -486,7 +504,7 @@ async function loadMoneyDonations() {
             <td>${escapeHtml(donation.siteName)}</td>
             <td>${escapeHtml(donation.nickname || donation.userId)}</td>
             <td>${escapeHtml(donation.donor || '-')}</td>
-            <td>${donation.amount ? parseInt(donation.amount).toLocaleString() + '円' : '-'}</td>
+            <td>${donation.amount ? parseInt(donation.amount).toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
             <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
           </tr>
         `).join('');
@@ -690,7 +708,7 @@ function showStatusChangeModal(reportIndex) {
           <tr><th>投稿者</th><td>${escapeHtml(report.nickname || report.userId)}</td></tr>
           <tr><th>開催日</th><td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td></tr>
           <tr><th>開催タイプ</th><td>${escapeHtml(report.eventType)}</td></tr>
-          <tr><th>金額</th><td>${report.amount ? report.amount.toLocaleString() + '円' : '金額未確定'}</td></tr>
+          <tr><th>金額</th><td>${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '金額未確定'}</td></tr>
         </table>
       </div>
     </div>
@@ -972,7 +990,7 @@ function updateMoneyDonationStatistics(donations) {
   };
   
   if (elements.totalAmount) {
-    elements.totalAmount.textContent = totalAmount.toLocaleString() + '円';
+    elements.totalAmount.textContent = totalAmount.toLocaleString().replace(/\\/g, '') + '円';
   } else {
     console.error('totalMoneyAmount要素が見つかりません');
   }
@@ -984,7 +1002,7 @@ function updateMoneyDonationStatistics(donations) {
   }
   
   if (elements.currentAmount) {
-    elements.currentAmount.textContent = currentMonthAmount.toLocaleString() + '円';
+    elements.currentAmount.textContent = currentMonthAmount.toLocaleString().replace(/\\/g, '') + '円';
   } else {
     console.error('currentMonthMoneyAmount要素が見つかりません');
   }
