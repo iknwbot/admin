@@ -359,12 +359,10 @@ async function loadFoodDonations() {
     
     if (result.success || result.data) {
       const kifuData = result.data || result.kifu || [];
-      console.log('寄付データ取得:', kifuData.length + '件');
+      console.log('寄付データ取得:', kifuData);
       
-      // 食品寄付（itemNameがあり、現金でないもの）
-      allFoodDonations = kifuData.filter(item => 
-        item.itemName && !item.itemName.includes('現金') && !item.kifuMoney && !item.amount
-      );
+      // 食品寄付データを取得（GASから返されるfoodプロパティ）
+      allFoodDonations = kifuData.food || [];
       
       console.log('食品寄付フィルター後:', allFoodDonations.length + '件');
       
@@ -375,9 +373,9 @@ async function loadFoodDonations() {
             <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
             <td>${escapeHtml(donation.siteName)}</td>
             <td>${escapeHtml(donation.nickname || donation.userId)}</td>
-            <td>${escapeHtml(donation.donor || donation.kifuFrom || '-')}</td>
-            <td>${escapeHtml(donation.itemName || donation.kifuItem || '-')}</td>
-            <td>${donation.webPublic === 'true' || donation.webPublic === true ? '公開' : '非公開'}</td>
+            <td>${escapeHtml(donation.donor || '-')}</td>
+            <td>${escapeHtml(donation.itemName || '-')}</td>
+            <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
             <td>${donation.instagramUrl ? '投稿済' : '未投稿'}</td>
           </tr>
         `).join('');
@@ -413,10 +411,8 @@ async function loadMoneyDonations() {
     
     if (result.success || result.data) {
       const kifuData = result.data || result.kifu || [];
-      // 金銭寄付（金額やkifuMoneyフィールドがあるもの）
-      allMoneyDonations = kifuData.filter(item => 
-        item.kifuMoney || item.amount || (item.itemName && item.itemName.includes('現金'))
-      );
+      // 金銭寄付データを取得（GASから返されるmoneyプロパティ）
+      allMoneyDonations = kifuData.money || [];
       
       const tbody = document.getElementById('moneyDonationsList');
       if (allMoneyDonations.length > 0) {
@@ -425,9 +421,9 @@ async function loadMoneyDonations() {
             <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
             <td>${escapeHtml(donation.siteName)}</td>
             <td>${escapeHtml(donation.nickname || donation.userId)}</td>
-            <td>${escapeHtml(donation.donor || donation.kifuFrom || '-')}</td>
-            <td>${donation.kifuMoney ? donation.kifuMoney.toLocaleString() + '円' : (donation.amount ? donation.amount.toLocaleString() + '円' : '-')}</td>
-            <td>${donation.webPublic === 'true' || donation.webPublic === true ? '公開' : '非公開'}</td>
+            <td>${escapeHtml(donation.donor || '-')}</td>
+            <td>${donation.amount ? donation.amount.toLocaleString() + '円' : '-'}</td>
+            <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
           </tr>
         `).join('');
       } else {
