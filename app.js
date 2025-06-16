@@ -785,6 +785,70 @@ setInterval(() => {
   }
 }, 60000); // 1分ごとにチェック
 
+// 拠点フィルター初期化
+function initializeSiteFilter() {
+  const siteFilter = document.getElementById('siteFilter');
+  if (!siteFilter) return;
+  
+  // 既存のオプションをクリア（「全て」以外）
+  while (siteFilter.options.length > 1) {
+    siteFilter.remove(1);
+  }
+  
+  // 重複を除いた拠点名を取得
+  const sites = [...new Set(allReports.map(report => report.siteName))].sort();
+  
+  sites.forEach(site => {
+    const option = document.createElement('option');
+    option.value = site;
+    option.textContent = site;
+    siteFilter.appendChild(option);
+  });
+}
+
+// ソート関数
+function sortReports(column) {
+  if (sortColumn === column) {
+    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortColumn = column;
+    sortDirection = 'asc';
+  }
+  filterReports();
+}
+
+// レポート配列をソート
+function sortReportsArray(reports) {
+  return reports.sort((a, b) => {
+    let aVal = a[sortColumn];
+    let bVal = b[sortColumn];
+    
+    // 日付の場合
+    if (sortColumn === 'timestamp' || sortColumn === 'eventDate') {
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
+    }
+    
+    // 数値の場合
+    if (sortColumn === 'amount') {
+      aVal = parseInt(aVal) || 0;
+      bVal = parseInt(bVal) || 0;
+    }
+    
+    // 文字列の場合
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (sortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+}
+
 // 食品寄付統計更新
 function updateFoodDonationStatistics(donations) {
   console.log('食品寄付統計更新開始:', donations.length, '件');

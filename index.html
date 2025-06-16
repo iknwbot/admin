@@ -135,6 +135,13 @@
                   <option value="完了">完了</option>
                 </select>
               </div>
+              <div class="col-md-3">
+                <label for="siteFilter" class="form-label">拠点名</label>
+                <select id="siteFilter" class="form-select">
+                  <option value="">全て</option>
+                  <!-- 動的に生成 -->
+                </select>
+              </div>
             </div>
 
             <div class="table-container">
@@ -148,15 +155,15 @@
               <table class="table" id="reportsTable" style="display:none;">
                 <thead>
                   <tr>
-                    <th style="width: 120px;">投稿日時</th>
-                    <th style="width: 120px;">拠点名</th>
-                    <th style="width: 100px;">投稿者</th>
-                    <th style="width: 100px;">開催日</th>
-                    <th style="width: 150px;">開催タイプ</th>
+                    <th style="width: 90px; cursor: pointer;" onclick="sortReports('timestamp')">投稿日時 <i class="bi bi-arrow-down-up"></i></th>
+                    <th style="width: 120px; cursor: pointer;" onclick="sortReports('siteName')">拠点名 <i class="bi bi-arrow-down-up"></i></th>
+                    <th style="width: 100px; cursor: pointer;" onclick="sortReports('nickname')">投稿者 <i class="bi bi-arrow-down-up"></i></th>
+                    <th style="width: 90px; cursor: pointer;" onclick="sortReports('eventDate')">開催日 <i class="bi bi-arrow-down-up"></i></th>
+                    <th style="width: 150px; cursor: pointer;" onclick="sortReports('eventType')">開催タイプ <i class="bi bi-arrow-down-up"></i></th>
                     <th style="width: 80px;">参加者</th>
-                    <th style="width: 80px;">金額</th>
-                    <th style="width: 120px;">ステータス</th>
-                    <th style="width: 80px;">詳細</th>
+                    <th style="width: 90px; cursor: pointer;" onclick="sortReports('amount')">金額 <i class="bi bi-arrow-down-up"></i></th>
+                    <th style="width: 100px; cursor: pointer;" onclick="sortReports('processingFlag')">ステータス <i class="bi bi-arrow-down-up"></i></th>
+                    <th style="width: 60px;">詳細</th>
                   </tr>
                 </thead>
                 <tbody id="reportsList">
