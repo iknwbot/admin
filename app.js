@@ -103,7 +103,13 @@ async function apiRequest(path, method = 'GET', data = null) {
     let url = CONFIG.API_URL;
     
     if (method === 'GET') {
-      url += `?action=${path}`;
+      // pathにクエリパラメータが含まれている場合の処理
+      if (path.includes('?')) {
+        const [action, params] = path.split('?');
+        url += `?action=${action}&${params}`;
+      } else {
+        url += `?action=${path}`;
+      }
     } else {
       const params = new URLSearchParams(data);
       options.body = params;
@@ -459,7 +465,8 @@ async function loadLogs() {
 // ユーザー読み込み
 async function loadUsers() {
   try {
-    const result = await apiRequest('getSite');
+    // 管理画面用の仮のuserIdを設定
+    const result = await apiRequest('getSite?userId=admin');
     
     if (result.success || result.data) {
       const userData = result.data || result.users || [];
@@ -468,9 +475,9 @@ async function loadUsers() {
       if (userData.length > 0) {
         tbody.innerHTML = userData.map(user => `
           <tr>
-            <td>${escapeHtml(user.siteName)}</td>
-            <td>${escapeHtml(user.adminName || user.nickname)}</td>
-            <td>${escapeHtml(user.lineId || user.userId)}</td>
+            <td>${escapeHtml(user.siteName || user.name)}</td>
+            <td>${escapeHtml(user.adminName || user.nickname || '-')}</td>
+            <td>${escapeHtml(user.lineId || user.userId || '-')}</td>
             <td>${user.registeredDate ? new Date(user.registeredDate).toLocaleDateString('ja-JP') : '-'}</td>
           </tr>
         `).join('');
@@ -487,7 +494,8 @@ async function loadUsers() {
 // 拠点読み込み
 async function loadSites() {
   try {
-    const result = await apiRequest('getSite');
+    // 管理画面用の仮のuserIdを設定
+    const result = await apiRequest('getSite?userId=admin');
     
     if (result.success || result.data) {
       const siteData = result.data || result.sites || [];
@@ -497,16 +505,16 @@ async function loadSites() {
         tbody.innerHTML = siteData.map(site => `
           <tr>
             <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.name)}" 
-                     onchange="updateSite('${escapeHtml(site.name)}', 'name', this.value)" readonly>
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.siteName || site.name)}" 
+                     onchange="updateSite('${escapeHtml(site.siteName || site.name)}', 'name', this.value)" readonly>
             </td>
             <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.webSite || '')}" 
-                     onchange="updateSite('${escapeHtml(site.name)}', 'webSite', this.value)">
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.webSite || site.website || '')}" 
+                     onchange="updateSite('${escapeHtml(site.siteName || site.name)}', 'webSite', this.value)">
             </td>
             <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.transferDestination || '')}" 
-                     onchange="updateSite('${escapeHtml(site.name)}', 'transferDestination', this.value)">
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.transferDestination || site.account || '')}" 
+                     onchange="updateSite('${escapeHtml(site.siteName || site.name)}', 'transferDestination', this.value)">
             </td>
             <td>
               <button class="btn btn-sm btn-primary" onclick="toggleEdit(this)">
