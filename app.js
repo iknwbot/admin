@@ -201,10 +201,27 @@ function showSection(sectionName, targetElement = null) {
   }
 }
 
-// 統計情報更新
-function updateStatistics(reports) {
+// 統計情報更新（常に対象月の全データを対象）
+function updateStatistics() {
+  if (!allReports || !Array.isArray(allReports)) {
+    console.log('allReports is not available yet');
+    return;
+  }
+  
+  const monthFilter = document.getElementById('monthFilter').value;
+  let monthReports = allReports;
+  
+  // 月フィルターのみ適用
+  if (monthFilter) {
+    monthReports = allReports.filter(report => {
+      const reportDate = new Date(report.timestamp);
+      const reportMonth = reportDate.getFullYear() + '-' + String(reportDate.getMonth() + 1).padStart(2, '0');
+      return reportMonth === monthFilter;
+    });
+  }
+  
   const statusCounts = {
-    total: reports.length,
+    total: monthReports.length,
     '投稿まち': 0,
     '金額確定まち': 0,
     '振込OK': 0,
@@ -212,7 +229,7 @@ function updateStatistics(reports) {
     '完了': 0
   };
   
-  reports.forEach(report => {
+  monthReports.forEach(report => {
     if (statusCounts.hasOwnProperty(report.processingFlag)) {
       statusCounts[report.processingFlag]++;
     }
@@ -242,6 +259,8 @@ async function loadReports() {
     
     if (result.success || result.data) {
       allReports = result.data || result.reports || [];
+      console.log('allReports loaded:', allReports.length, 'items');
+      await initializeSiteFilter(); // 拠点フィルターを更新
       filterReports();
       
       loading.style.display = 'none';
