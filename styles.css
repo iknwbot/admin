@@ -83,6 +83,26 @@ body {
   margin-bottom: 0;
 }
 
+/* 小さい統計カード */
+.stat-card-sm {
+  margin-bottom: 10px;
+}
+
+.stat-card-sm .card-body {
+  padding: 15px;
+}
+
+.stat-card-sm .card-title {
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.stat-card-sm h4 {
+  font-weight: 700;
+  margin-bottom: 0;
+  font-size: 1.5rem;
+}
+
 /* テーブルコンテナ */
 .table-container {
   background: white;

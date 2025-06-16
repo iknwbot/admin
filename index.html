@@ -34,17 +34,23 @@
             <h5>管理メニュー</h5>
           </div>
           <nav>
-            <a href="#" class="nav-link active" onclick="showSection('dashboard')">
-              <i class="bi bi-speedometer2"></i> ダッシュボード
-            </a>
-            <a href="#" class="nav-link" onclick="showSection('reports')">
+            <a href="#" class="nav-link active" onclick="showSection('reports')">
               <i class="bi bi-file-text"></i> 活動報告
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('food-donations')">
+              <i class="bi bi-gift"></i> 寄付報告（食品）
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('money-donations')">
+              <i class="bi bi-currency-yen"></i> 寄付報告（金銭）
             </a>
             <a href="#" class="nav-link" onclick="showSection('users')">
               <i class="bi bi-people"></i> ユーザー管理
             </a>
             <a href="#" class="nav-link" onclick="showSection('sites')">
               <i class="bi bi-building"></i> 拠点管理
+            </a>
+            <a href="#" class="nav-link" onclick="showSection('logs')">
+              <i class="bi bi-list-ul"></i> ログ
             </a>
             <a href="#" class="nav-link" onclick="logout()">
               <i class="bi bi-box-arrow-right"></i> ログアウト
@@ -54,68 +60,84 @@
 
         <!-- メインコンテンツ -->
         <div class="col-md-10 content-area">
-          <!-- ダッシュボード -->
-          <div id="dashboard" class="section">
-            <h2>ダッシュボード</h2>
-            <div class="row mt-4">
-              <div class="col-md-3">
-                <div class="card stat-card">
-                  <div class="card-body">
-                    <h5 class="card-title">総報告数</h5>
-                    <h2 class="text-primary" id="totalReports">-</h2>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="card stat-card">
-                  <div class="card-body">
-                    <h5 class="card-title">未処理</h5>
-                    <h2 class="text-warning" id="pendingReports">-</h2>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="card stat-card">
-                  <div class="card-body">
-                    <h5 class="card-title">ユーザー数</h5>
-                    <h2 class="text-success" id="totalUsers">-</h2>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="card stat-card">
-                  <div class="card-body">
-                    <h5 class="card-title">拠点数</h5>
-                    <h2 class="text-info" id="totalSites">-</h2>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-5">
-              <h4>最新の報告</h4>
-              <div class="table-container">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th>拠点名</th>
-                      <th>イベントタイプ</th>
-                      <th>日時</th>
-                      <th>ステータス</th>
-                    </tr>
-                  </thead>
-                  <tbody id="recentReports">
-                    <tr><td colspan="4" class="text-center">データ読み込み中...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
           <!-- 活動報告 -->
-          <div id="reports" class="section" style="display:none;">
-            <h2>活動報告一覧</h2>
-            <div class="table-container mt-4">
+          <div id="reports" class="section">
+            <h2>活動報告</h2>
+            
+            <!-- ダッシュボード統計 -->
+            <div class="row mt-3 mb-4">
+              <div class="col-md-2">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">総報告数</h6>
+                    <h4 class="text-primary" id="totalReports">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-2">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">投稿まち</h6>
+                    <h4 class="text-warning" id="statusWaiting">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-2">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">金額確定まち</h6>
+                    <h4 class="text-info" id="statusAmountWaiting">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-2">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">振込OK</h6>
+                    <h4 class="text-success" id="statusOK">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-2">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">振込NG</h6>
+                    <h4 class="text-danger" id="statusNG">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-2">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">完了</h6>
+                    <h4 class="text-dark" id="statusCompleted">-</h4>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- フィルター -->
+            <div class="row mb-3">
+              <div class="col-md-3">
+                <label for="monthFilter" class="form-label">対象月</label>
+                <select id="monthFilter" class="form-select">
+                  <!-- 動的に生成 -->
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="statusFilter" class="form-label">ステータス</label>
+                <select id="statusFilter" class="form-select">
+                  <option value="">全て</option>
+                  <option value="投稿まち">投稿まち</option>
+                  <option value="金額確定まち">金額確定まち</option>
+                  <option value="振込OK">振込OK</option>
+                  <option value="振込NG">振込NG</option>
+                  <option value="完了">完了</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-container">
               <div class="loading">
                 <div class="spinner-border" role="status">
                   <span class="visually-hidden">Loading...</span>
@@ -126,13 +148,15 @@
               <table class="table" id="reportsTable" style="display:none;">
                 <thead>
                   <tr>
-                    <th>日時</th>
-                    <th>拠点名</th>
-                    <th>イベント</th>
-                    <th>参加者</th>
-                    <th>金額</th>
-                    <th>ステータス</th>
-                    <th>操作</th>
+                    <th style="width: 120px;">投稿日時</th>
+                    <th style="width: 120px;">拠点名</th>
+                    <th style="width: 100px;">投稿者</th>
+                    <th style="width: 100px;">開催日</th>
+                    <th style="width: 150px;">開催タイプ</th>
+                    <th style="width: 80px;">参加者</th>
+                    <th style="width: 80px;">金額</th>
+                    <th style="width: 120px;">ステータス</th>
+                    <th style="width: 80px;">詳細</th>
                   </tr>
                 </thead>
                 <tbody id="reportsList">
@@ -141,20 +165,74 @@
             </div>
           </div>
 
+          <!-- 寄付報告（食品） -->
+          <div id="food-donations" class="section" style="display:none;">
+            <h2>寄付報告（食品）</h2>
+            <div class="table-container mt-4">
+              <div class="loading">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>データを読み込んでいます...</p>
+              </div>
+              <div class="error-message"></div>
+              <table class="table" id="foodDonationsTable" style="display:none;">
+                <thead>
+                  <tr>
+                    <th>申告日</th>
+                    <th>拠点名</th>
+                    <th>投稿者</th>
+                    <th>寄付元</th>
+                    <th>品名</th>
+                    <th>公開/非公開</th>
+                    <th>SNS投稿</th>
+                  </tr>
+                </thead>
+                <tbody id="foodDonationsList">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 寄付報告（金銭） -->
+          <div id="money-donations" class="section" style="display:none;">
+            <h2>寄付報告（金銭）</h2>
+            <div class="table-container mt-4">
+              <div class="loading">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>データを読み込んでいます...</p>
+              </div>
+              <div class="error-message"></div>
+              <table class="table" id="moneyDonationsTable" style="display:none;">
+                <thead>
+                  <tr>
+                    <th>申告日</th>
+                    <th>拠点名</th>
+                    <th>投稿者</th>
+                    <th>寄付元</th>
+                    <th>金額</th>
+                    <th>公開/非公開</th>
+                  </tr>
+                </thead>
+                <tbody id="moneyDonationsList">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- ユーザー管理 -->
           <div id="users" class="section" style="display:none;">
             <h2>ユーザー管理</h2>
-            <button class="btn btn-primary mb-3" onclick="showAddUserModal()">
-              <i class="bi bi-plus-circle"></i> ユーザー追加
-            </button>
-            <div class="table-container">
+            <div class="table-container mt-4">
               <table class="table">
                 <thead>
                   <tr>
                     <th>拠点名</th>
                     <th>管理者名</th>
                     <th>LINE ID</th>
-                    <th>操作</th>
+                    <th>登録日</th>
                   </tr>
                 </thead>
                 <tbody id="usersList">
@@ -167,21 +245,43 @@
           <!-- 拠点管理 -->
           <div id="sites" class="section" style="display:none;">
             <h2>拠点管理</h2>
-            <button class="btn btn-primary mb-3" onclick="showAddSiteModal()">
-              <i class="bi bi-plus-circle"></i> 拠点追加
-            </button>
-            <div class="table-container">
+            <div class="table-container mt-4">
               <table class="table">
                 <thead>
                   <tr>
-                    <th>拠点名</th>
-                    <th>住所</th>
-                    <th>振込先</th>
-                    <th>操作</th>
+                    <th style="width: 200px;">拠点名</th>
+                    <th style="width: 300px;">Webサイト</th>
+                    <th style="width: 300px;">振込口座</th>
+                    <th style="width: 100px;">操作</th>
                   </tr>
                 </thead>
                 <tbody id="sitesList">
                   <tr><td colspan="4" class="text-center">データ読み込み中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ログ -->
+          <div id="logs" class="section" style="display:none;">
+            <h2>ログ</h2>
+            <div class="table-container mt-4">
+              <div class="loading">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>データを読み込んでいます...</p>
+              </div>
+              <div class="error-message"></div>
+              <table class="table" id="logsTable" style="display:none;">
+                <thead>
+                  <tr>
+                    <th style="width: 180px;">タイムスタンプ</th>
+                    <th style="width: 120px;">種類</th>
+                    <th>詳細</th>
+                  </tr>
+                </thead>
+                <tbody id="logsList">
                 </tbody>
               </table>
             </div>
@@ -223,33 +323,19 @@
     </div>
   </div>
 
-  <!-- 拠点追加モーダル -->
-  <div class="modal fade" id="addSiteModal" tabindex="-1">
-    <div class="modal-dialog">
+  <!-- 詳細モーダル -->
+  <div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">拠点追加</h5>
+          <h5 class="modal-title">活動報告詳細</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body">
-          <form id="addSiteForm">
-            <div class="mb-3">
-              <label class="form-label">拠点名</label>
-              <input type="text" class="form-control" name="name" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">住所</label>
-              <input type="text" class="form-control" name="address">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">振込先</label>
-              <input type="text" class="form-control" name="transferDestination">
-            </div>
-          </form>
+        <div class="modal-body" id="detailModalBody">
+          <!-- 詳細内容が動的に挿入される -->
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-          <button type="button" class="btn btn-primary" onclick="addSite()">追加</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
         </div>
       </div>
     </div>

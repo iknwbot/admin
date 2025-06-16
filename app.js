@@ -1,10 +1,39 @@
 // メインアプリケーション
-let currentSection = 'dashboard';
+let currentSection = 'reports';
+let allReports = [];
+let allFoodDonations = [];
+let allMoneyDonations = [];
+let allLogs = [];
 
 // 初期化
 window.onload = function() {
   checkAuth();
+  initializeFilters();
 };
+
+// フィルター初期化
+function initializeFilters() {
+  // 月フィルターの初期化（過去12ヶ月 + 現在月）
+  const monthFilter = document.getElementById('monthFilter');
+  const now = new Date();
+  
+  for (let i = 0; i < 12; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const yearMonth = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+    const displayText = date.getFullYear() + '年' + (date.getMonth() + 1) + '月';
+    
+    const option = document.createElement('option');
+    option.value = yearMonth;
+    option.textContent = displayText;
+    if (i === 0) option.selected = true; // 現在月をデフォルト選択
+    
+    monthFilter.appendChild(option);
+  }
+  
+  // フィルター変更時のイベント
+  monthFilter.addEventListener('change', filterReports);
+  document.getElementById('statusFilter').addEventListener('change', filterReports);
+}
 
 // 認証チェック
 function checkAuth() {
@@ -13,7 +42,7 @@ function checkAuth() {
     const authData = JSON.parse(auth);
     if (new Date().getTime() - authData.timestamp < CONFIG.SESSION_TIMEOUT) {
       showMainScreen();
-      loadDashboard();
+      showSection('reports');
       return;
     }
   }
@@ -46,7 +75,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     }));
     errorDiv.classList.add('d-none');
     showMainScreen();
-    loadDashboard();
+    showSection('reports');
   } else {
     // 認証失敗
     errorDiv.textContent = 'アクセスキーが正しくありません';
@@ -74,9 +103,10 @@ async function apiRequest(path, method = 'GET', data = null) {
     let url = CONFIG.API_URL;
     
     if (method === 'GET') {
-      url += `?path=${path}`;
+      url += `?action=${path}`;
     } else {
-      options.body = new URLSearchParams(data);
+      const params = new URLSearchParams(data);
+      options.body = params;
     }
     
     const response = await fetch(url, options);
@@ -113,11 +143,14 @@ function showSection(sectionName) {
   
   // データをロード
   switch(sectionName) {
-    case 'dashboard':
-      loadDashboard();
-      break;
     case 'reports':
       loadReports();
+      break;
+    case 'food-donations':
+      loadFoodDonations();
+      break;
+    case 'money-donations':
+      loadMoneyDonations();
       break;
     case 'users':
       loadUsers();
@@ -125,40 +158,35 @@ function showSection(sectionName) {
     case 'sites':
       loadSites();
       break;
+    case 'logs':
+      loadLogs();
+      break;
   }
 }
 
-// ダッシュボード読み込み
-async function loadDashboard() {
-  try {
-    const result = await apiRequest('admin/dashboard');
-    
-    if (result.success) {
-      const data = result.data;
-      document.getElementById('totalReports').textContent = data.totalReports;
-      document.getElementById('pendingReports').textContent = data.pendingReports;
-      document.getElementById('totalUsers').textContent = data.totalUsers;
-      document.getElementById('totalSites').textContent = data.totalSites;
-      
-      // 最新報告を表示
-      const tbody = document.getElementById('recentReports');
-      if (data.recentReports.length > 0) {
-        tbody.innerHTML = data.recentReports.map(report => `
-          <tr>
-            <td>${escapeHtml(report.siteName)}</td>
-            <td>${escapeHtml(report.eventType)}</td>
-            <td>${new Date(report.timestamp).toLocaleDateString('ja-JP')}</td>
-            <td><span class="badge ${report.processingFlag === '投稿まち' ? 'bg-warning' : 'bg-success'}">${escapeHtml(report.processingFlag)}</span></td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center">データがありません</td></tr>';
-      }
+// 統計情報更新
+function updateStatistics(reports) {
+  const statusCounts = {
+    total: reports.length,
+    '投稿まち': 0,
+    '金額確定まち': 0,
+    '振込OK': 0,
+    '振込NG': 0,
+    '完了': 0
+  };
+  
+  reports.forEach(report => {
+    if (statusCounts.hasOwnProperty(report.processingFlag)) {
+      statusCounts[report.processingFlag]++;
     }
-  } catch (error) {
-    console.error('Dashboard load error:', error);
-    showError('ダッシュボードの読み込みに失敗しました');
-  }
+  });
+  
+  document.getElementById('totalReports').textContent = statusCounts.total;
+  document.getElementById('statusWaiting').textContent = statusCounts['投稿まち'];
+  document.getElementById('statusAmountWaiting').textContent = statusCounts['金額確定まち'];
+  document.getElementById('statusOK').textContent = statusCounts['振込OK'];
+  document.getElementById('statusNG').textContent = statusCounts['振込NG'];
+  document.getElementById('statusCompleted').textContent = statusCounts['完了'];
 }
 
 // 活動報告読み込み
@@ -173,28 +201,155 @@ async function loadReports() {
   table.style.display = 'none';
   
   try {
-    const result = await apiRequest('admin/reports');
+    const result = await apiRequest('getInternalReports');
     
-    if (result.success) {
-      const tbody = document.getElementById('reportsList');
-      if (result.data.length > 0) {
-        tbody.innerHTML = result.data.map(report => `
+    if (result.success || result.data) {
+      allReports = result.data || result.reports || [];
+      filterReports();
+      
+      loading.style.display = 'none';
+      table.style.display = 'table';
+    } else {
+      throw new Error(result.error || 'データ取得エラー');
+    }
+  } catch (error) {
+    loading.style.display = 'none';
+    errorMsg.textContent = 'エラー: ' + error.message;
+    errorMsg.style.display = 'block';
+  }
+}
+
+// フィルター適用
+function filterReports() {
+  const monthFilter = document.getElementById('monthFilter').value;
+  const statusFilter = document.getElementById('statusFilter').value;
+  
+  let filteredReports = allReports;
+  
+  // 月フィルター
+  if (monthFilter) {
+    filteredReports = filteredReports.filter(report => {
+      const reportDate = new Date(report.timestamp);
+      const reportMonth = reportDate.getFullYear() + '-' + String(reportDate.getMonth() + 1).padStart(2, '0');
+      return reportMonth === monthFilter;
+    });
+  }
+  
+  // ステータスフィルター
+  if (statusFilter) {
+    filteredReports = filteredReports.filter(report => report.processingFlag === statusFilter);
+  }
+  
+  // 統計更新
+  updateStatistics(filteredReports);
+  
+  // テーブル更新
+  const tbody = document.getElementById('reportsList');
+  if (filteredReports.length > 0) {
+    tbody.innerHTML = filteredReports.map((report, index) => `
+      <tr>
+        <td>${new Date(report.timestamp).toLocaleDateString('ja-JP')}</td>
+        <td>${escapeHtml(report.siteName)}</td>
+        <td>${escapeHtml(report.nickname || report.userId)}</td>
+        <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
+        <td>${escapeHtml(report.eventType)}</td>
+        <td>大人:${report.adults} 子:${report.children}</td>
+        <td>${report.amount ? report.amount.toLocaleString() + '円' : '-'}</td>
+        <td>
+          <select class="form-select form-select-sm" onchange="updateReportStatus(${index}, this.value)">
+            <option value="投稿まち" ${report.processingFlag === '投稿まち' ? 'selected' : ''}>投稿まち</option>
+            <option value="金額確定まち" ${report.processingFlag === '金額確定まち' ? 'selected' : ''}>金額確定まち</option>
+            <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>振込OK</option>
+            <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>振込NG</option>
+            <option value="完了" ${report.processingFlag === '完了' ? 'selected' : ''}>完了</option>
+          </select>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary" onclick="showReportDetails(${index})">
+            詳細
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// 報告詳細表示
+function showReportDetails(index) {
+  const report = allReports[index];
+  if (!report) return;
+  
+  const modalBody = document.getElementById('detailModalBody');
+  modalBody.innerHTML = `
+    <div class="row">
+      <div class="col-md-6">
+        <h6>基本情報</h6>
+        <p><strong>投稿日時:</strong> ${new Date(report.timestamp).toLocaleString('ja-JP')}</p>
+        <p><strong>拠点名:</strong> ${escapeHtml(report.siteName)}</p>
+        <p><strong>投稿者:</strong> ${escapeHtml(report.nickname || report.userId)}</p>
+        <p><strong>開催日:</strong> ${new Date(report.eventDate).toLocaleDateString('ja-JP')}</p>
+        <p><strong>開催タイプ:</strong> ${escapeHtml(report.eventType)}</p>
+      </div>
+      <div class="col-md-6">
+        <h6>参加者・金額</h6>
+        <p><strong>大人:</strong> ${report.adults}人</p>
+        <p><strong>子ども:</strong> ${report.children}人</p>
+        <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString() + '円' : '未確定'}</p>
+        <p><strong>ステータス:</strong> ${escapeHtml(report.processingFlag || '投稿まち')}</p>
+      </div>
+    </div>
+    ${report.comment ? `
+    <div class="row mt-3">
+      <div class="col-12">
+        <h6>コメント</h6>
+        <p>${escapeHtml(report.comment)}</p>
+      </div>
+    </div>
+    ` : ''}
+    ${report.imageUrl ? `
+    <div class="row mt-3">
+      <div class="col-12">
+        <h6>添付画像</h6>
+        <img src="${report.imageUrl}" class="img-fluid" style="max-height: 300px;" alt="活動画像">
+      </div>
+    </div>
+    ` : ''}
+  `;
+  
+  new bootstrap.Modal(document.getElementById('detailModal')).show();
+}
+
+// 食品寄付読み込み
+async function loadFoodDonations() {
+  const container = document.querySelector('#food-donations .table-container');
+  const loading = container.querySelector('.loading');
+  const errorMsg = container.querySelector('.error-message');
+  const table = document.getElementById('foodDonationsTable');
+  
+  loading.style.display = 'block';
+  errorMsg.style.display = 'none';
+  table.style.display = 'none';
+  
+  try {
+    const result = await apiRequest('getKifuReports');
+    
+    if (result.success || result.data) {
+      const kifuData = result.data || result.kifu || [];
+      allFoodDonations = kifuData.filter(item => item.kifuType === '食品寄付');
+      
+      const tbody = document.getElementById('foodDonationsList');
+      if (allFoodDonations.length > 0) {
+        tbody.innerHTML = allFoodDonations.map(donation => `
           <tr>
-            <td>${new Date(report.timestamp).toLocaleDateString('ja-JP')}</td>
-            <td>${escapeHtml(report.siteName)}</td>
-            <td>${escapeHtml(report.eventType)}</td>
-            <td>大人: ${report.adults}<br>子供: ${report.children}</td>
-            <td>${report.amount.toLocaleString()}円</td>
-            <td>
-              <select class="form-select form-select-sm" onchange="updateReportStatus(${report.id}, this.value)">
-                <option value="投稿まち" ${report.processingFlag === '投稿まち' ? 'selected' : ''}>投稿まち</option>
-                <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>振込OK</option>
-                <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>振込NG</option>
-              </select>
-            </td>
-            <td>
-              ${report.imageUrl ? `<a href="${report.imageUrl}" target="_blank" class="btn btn-sm btn-outline-primary">画像</a>` : '-'}
-            </td>
+            <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
+            <td>${escapeHtml(donation.siteName)}</td>
+            <td>${escapeHtml(donation.nickname || donation.userId)}</td>
+            <td>${escapeHtml(donation.kifuFrom)}</td>
+            <td>${escapeHtml(donation.kifuItem)}</td>
+            <td>${donation.webPublic === 'true' ? '公開' : '非公開'}</td>
+            <td>${donation.instagramPosted === 'true' ? '投稿済' : '未投稿'}</td>
           </tr>
         `).join('');
       } else {
@@ -213,24 +368,110 @@ async function loadReports() {
   }
 }
 
+// 金銭寄付読み込み
+async function loadMoneyDonations() {
+  const container = document.querySelector('#money-donations .table-container');
+  const loading = container.querySelector('.loading');
+  const errorMsg = container.querySelector('.error-message');
+  const table = document.getElementById('moneyDonationsTable');
+  
+  loading.style.display = 'block';
+  errorMsg.style.display = 'none';
+  table.style.display = 'none';
+  
+  try {
+    const result = await apiRequest('getKifuReports');
+    
+    if (result.success || result.data) {
+      const kifuData = result.data || result.kifu || [];
+      allMoneyDonations = kifuData.filter(item => item.kifuType === '金銭寄付');
+      
+      const tbody = document.getElementById('moneyDonationsList');
+      if (allMoneyDonations.length > 0) {
+        tbody.innerHTML = allMoneyDonations.map(donation => `
+          <tr>
+            <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
+            <td>${escapeHtml(donation.siteName)}</td>
+            <td>${escapeHtml(donation.nickname || donation.userId)}</td>
+            <td>${escapeHtml(donation.kifuFrom)}</td>
+            <td>${donation.kifuMoney ? donation.kifuMoney.toLocaleString() + '円' : '-'}</td>
+            <td>${donation.webPublic === 'true' ? '公開' : '非公開'}</td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">データがありません</td></tr>';
+      }
+      
+      loading.style.display = 'none';
+      table.style.display = 'table';
+    } else {
+      throw new Error(result.error || 'データ取得エラー');
+    }
+  } catch (error) {
+    loading.style.display = 'none';
+    errorMsg.textContent = 'エラー: ' + error.message;
+    errorMsg.style.display = 'block';
+  }
+}
+
+// ログ読み込み
+async function loadLogs() {
+  const container = document.querySelector('#logs .table-container');
+  const loading = container.querySelector('.loading');
+  const errorMsg = container.querySelector('.error-message');
+  const table = document.getElementById('logsTable');
+  
+  loading.style.display = 'block';
+  errorMsg.style.display = 'none';
+  table.style.display = 'none';
+  
+  try {
+    const result = await apiRequest('getLogs');
+    
+    if (result.success || result.data) {
+      allLogs = result.data || result.logs || [];
+      
+      const tbody = document.getElementById('logsList');
+      if (allLogs.length > 0) {
+        tbody.innerHTML = allLogs.slice(0, 100).map(log => `
+          <tr>
+            <td>${new Date(log.timestamp).toLocaleString('ja-JP')}</td>
+            <td>${escapeHtml(log.type || log.action)}</td>
+            <td>${escapeHtml(log.details || log.message)}</td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center">データがありません</td></tr>';
+      }
+      
+      loading.style.display = 'none';
+      table.style.display = 'table';
+    } else {
+      throw new Error(result.error || 'データ取得エラー');
+    }
+  } catch (error) {
+    loading.style.display = 'none';
+    errorMsg.textContent = 'エラー: ' + error.message;
+    errorMsg.style.display = 'block';
+  }
+}
+
 // ユーザー読み込み
 async function loadUsers() {
   try {
-    const result = await apiRequest('admin/users');
+    const result = await apiRequest('getSite');
     
-    if (result.success) {
+    if (result.success || result.data) {
+      const userData = result.data || result.users || [];
       const tbody = document.getElementById('usersList');
-      if (result.data.length > 0) {
-        tbody.innerHTML = result.data.map(user => `
+      
+      if (userData.length > 0) {
+        tbody.innerHTML = userData.map(user => `
           <tr>
             <td>${escapeHtml(user.siteName)}</td>
-            <td>${escapeHtml(user.adminName)}</td>
-            <td>${escapeHtml(user.lineId)}</td>
-            <td>
-              <button class="btn btn-sm btn-danger" onclick="deleteUser('${escapeHtml(user.lineId)}')">
-                <i class="bi bi-trash"></i> 削除
-              </button>
-            </td>
+            <td>${escapeHtml(user.adminName || user.nickname)}</td>
+            <td>${escapeHtml(user.lineId || user.userId)}</td>
+            <td>${user.registeredDate ? new Date(user.registeredDate).toLocaleDateString('ja-JP') : '-'}</td>
           </tr>
         `).join('');
       } else {
@@ -246,19 +487,30 @@ async function loadUsers() {
 // 拠点読み込み
 async function loadSites() {
   try {
-    const result = await apiRequest('admin/sites');
+    const result = await apiRequest('getSite');
     
-    if (result.success) {
+    if (result.success || result.data) {
+      const siteData = result.data || result.sites || [];
       const tbody = document.getElementById('sitesList');
-      if (result.data.length > 0) {
-        tbody.innerHTML = result.data.map(site => `
+      
+      if (siteData.length > 0) {
+        tbody.innerHTML = siteData.map(site => `
           <tr>
-            <td>${escapeHtml(site.name)}</td>
-            <td>${escapeHtml(site.address || '-')}</td>
-            <td>${escapeHtml(site.transferDestination || '-')}</td>
             <td>
-              <button class="btn btn-sm btn-danger" onclick="deleteSite('${escapeHtml(site.name)}')">
-                <i class="bi bi-trash"></i> 削除
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.name)}" 
+                     onchange="updateSite('${escapeHtml(site.name)}', 'name', this.value)" readonly>
+            </td>
+            <td>
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.webSite || '')}" 
+                     onchange="updateSite('${escapeHtml(site.name)}', 'webSite', this.value)">
+            </td>
+            <td>
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.transferDestination || '')}" 
+                     onchange="updateSite('${escapeHtml(site.name)}', 'transferDestination', this.value)">
+            </td>
+            <td>
+              <button class="btn btn-sm btn-primary" onclick="toggleEdit(this)">
+                <i class="bi bi-pencil"></i> 編集
               </button>
             </td>
           </tr>
@@ -273,150 +525,89 @@ async function loadSites() {
   }
 }
 
+// 編集モード切り替え
+function toggleEdit(button) {
+  const row = button.closest('tr');
+  const inputs = row.querySelectorAll('input:not([readonly])');
+  const isEditing = button.textContent.includes('保存');
+  
+  if (isEditing) {
+    // 保存処理
+    button.innerHTML = '<i class="bi bi-pencil"></i> 編集';
+    inputs.forEach(input => input.disabled = true);
+    showSuccess('変更を保存しました');
+  } else {
+    // 編集モード
+    button.innerHTML = '<i class="bi bi-check"></i> 保存';
+    inputs.forEach(input => input.disabled = false);
+  }
+}
+
+// サイト情報更新
+async function updateSite(siteName, field, value) {
+  try {
+    const result = await apiRequest('updateSite', 'POST', {
+      action: 'updateSite',
+      siteName: siteName,
+      field: field,
+      value: value
+    });
+    
+    if (result.success) {
+      showSuccess('拠点情報を更新しました');
+    } else {
+      throw new Error(result.error || '更新に失敗しました');
+    }
+  } catch (error) {
+    showError('更新に失敗しました: ' + error.message);
+  }
+}
+
 // レポートステータス更新
-async function updateReportStatus(reportId, newStatus) {
+async function updateReportStatus(reportIndex, newStatus) {
   if (!confirm(`ステータスを「${newStatus}」に変更しますか？`)) {
-    // 元に戻す
-    loadReports();
+    filterReports(); // 元に戻す
     return;
   }
   
+  const report = allReports[reportIndex];
+  if (!report) return;
+  
   try {
-    const result = await apiRequest('', 'POST', {
-      action: 'admin_updateReportStatus',
-      reportId: reportId,
+    const result = await apiRequest('updateReportStatus', 'POST', {
+      action: 'updateReportStatus',
+      timestamp: report.timestamp,
+      siteName: report.siteName,
       status: newStatus
     });
     
     if (result.success) {
+      // ローカルデータを更新
+      allReports[reportIndex].processingFlag = newStatus;
+      filterReports(); // 表示を更新
       showSuccess('ステータスを更新しました');
     } else {
       throw new Error(result.error || '更新に失敗しました');
     }
   } catch (error) {
     showError('更新に失敗しました: ' + error.message);
-    loadReports(); // リロードして元に戻す
-  }
-}
-
-// ユーザー追加モーダル表示
-function showAddUserModal() {
-  document.getElementById('addUserForm').reset();
-  new bootstrap.Modal(document.getElementById('addUserModal')).show();
-}
-
-// ユーザー追加
-async function addUser() {
-  const form = document.getElementById('addUserForm');
-  const formData = new FormData(form);
-  
-  try {
-    const result = await apiRequest('', 'POST', {
-      action: 'admin_addUser',
-      siteName: formData.get('siteName'),
-      adminName: formData.get('adminName'),
-      lineId: formData.get('lineId')
-    });
-    
-    if (result.success) {
-      showSuccess('ユーザーを追加しました');
-      bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
-      loadUsers();
-    } else {
-      throw new Error(result.error || '追加に失敗しました');
-    }
-  } catch (error) {
-    showError('追加に失敗しました: ' + error.message);
-  }
-}
-
-// ユーザー削除
-async function deleteUser(lineId) {
-  if (!confirm('本当に削除しますか？')) return;
-  
-  try {
-    const result = await apiRequest('', 'POST', {
-      action: 'admin_deleteUser',
-      lineId: lineId
-    });
-    
-    if (result.success) {
-      showSuccess('ユーザーを削除しました');
-      loadUsers();
-    } else {
-      throw new Error(result.error || '削除に失敗しました');
-    }
-  } catch (error) {
-    showError('削除に失敗しました: ' + error.message);
-  }
-}
-
-// 拠点追加モーダル表示
-function showAddSiteModal() {
-  document.getElementById('addSiteForm').reset();
-  new bootstrap.Modal(document.getElementById('addSiteModal')).show();
-}
-
-// 拠点追加
-async function addSite() {
-  const form = document.getElementById('addSiteForm');
-  const formData = new FormData(form);
-  
-  try {
-    const result = await apiRequest('', 'POST', {
-      action: 'admin_addSite',
-      name: formData.get('name'),
-      address: formData.get('address'),
-      transferDestination: formData.get('transferDestination')
-    });
-    
-    if (result.success) {
-      showSuccess('拠点を追加しました');
-      bootstrap.Modal.getInstance(document.getElementById('addSiteModal')).hide();
-      loadSites();
-    } else {
-      throw new Error(result.error || '追加に失敗しました');
-    }
-  } catch (error) {
-    showError('追加に失敗しました: ' + error.message);
-  }
-}
-
-// 拠点削除
-async function deleteSite(siteName) {
-  if (!confirm('本当に削除しますか？')) return;
-  
-  try {
-    const result = await apiRequest('', 'POST', {
-      action: 'admin_deleteSite',
-      siteName: siteName
-    });
-    
-    if (result.success) {
-      showSuccess('拠点を削除しました');
-      loadSites();
-    } else {
-      throw new Error(result.error || '削除に失敗しました');
-    }
-  } catch (error) {
-    showError('削除に失敗しました: ' + error.message);
+    filterReports(); // 元に戻す
   }
 }
 
 // ユーティリティ関数
 function escapeHtml(text) {
+  if (!text) return '';
   const div = document.createElement('div');
-  div.textContent = text;
+  div.textContent = text.toString();
   return div.innerHTML;
 }
 
 function showSuccess(message) {
-  // Bootstrapのトーストまたはアラートで表示
   alert('✅ ' + message);
 }
 
 function showError(message) {
-  // Bootstrapのトーストまたはアラートで表示
   alert('❌ ' + message);
 }
 
