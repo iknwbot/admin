@@ -130,7 +130,7 @@ async function apiRequest(path, method = 'GET', data = null) {
 }
 
 // セクション切り替え
-function showSection(sectionName) {
+function showSection(sectionName, targetElement = null) {
   currentSection = sectionName;
   
   // すべてのセクションを非表示
@@ -142,10 +142,26 @@ function showSection(sectionName) {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.remove('active');
   });
-  event.target.closest('.nav-link').classList.add('active');
+  
+  // クリックされた要素またはsectionNameに対応するリンクをアクティブにする
+  if (targetElement) {
+    targetElement.closest('.nav-link').classList.add('active');
+  } else {
+    // 自動呼び出しの場合、対応するナビゲーションリンクを探してアクティブにする
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+      const onclick = link.getAttribute('onclick');
+      if (onclick && onclick.includes(`'${sectionName}'`)) {
+        link.classList.add('active');
+      }
+    });
+  }
   
   // 選択されたセクションを表示
-  document.getElementById(sectionName).style.display = 'block';
+  const sectionElement = document.getElementById(sectionName);
+  if (sectionElement) {
+    sectionElement.style.display = 'block';
+  }
   
   // データをロード
   switch(sectionName) {
