@@ -4,6 +4,8 @@ let allReports = [];
 let allFoodDonations = [];
 let allMoneyDonations = [];
 let allLogs = [];
+let allUsers = [];
+let allSites = [];
 
 // 初期化
 window.onload = function() {
@@ -13,8 +15,18 @@ window.onload = function() {
 
 // フィルター初期化
 function initializeFilters() {
-  // 月フィルターの初期化（過去12ヶ月 + 現在月）
-  const monthFilter = document.getElementById('monthFilter');
+  initializeMonthFilter('monthFilter', filterReports);
+  initializeMonthFilter('foodMonthFilter', filterFoodDonations);
+  initializeMonthFilter('moneyMonthFilter', filterMoneyDonations);
+  
+  // フィルター変更時のイベント
+  document.getElementById('statusFilter').addEventListener('change', filterReports);
+}
+
+function initializeMonthFilter(filterId, filterFunction) {
+  const monthFilter = document.getElementById(filterId);
+  if (!monthFilter) return;
+  
   const now = new Date();
   
   for (let i = 0; i < 12; i++) {
@@ -25,14 +37,12 @@ function initializeFilters() {
     const option = document.createElement('option');
     option.value = yearMonth;
     option.textContent = displayText;
-    if (i === 0) option.selected = true; // 現在月をデフォルト選択
+    if (i === 0 && filterId === 'monthFilter') option.selected = true; // 活動報告のみ現在月をデフォルト
     
     monthFilter.appendChild(option);
   }
   
-  // フィルター変更時のイベント
-  monthFilter.addEventListener('change', filterReports);
-  document.getElementById('statusFilter').addEventListener('change', filterReports);
+  monthFilter.addEventListener('change', filterFunction);
 }
 
 // 認証チェック
@@ -278,13 +288,16 @@ function filterReports() {
         <td>大人:${report.adults} 子:${report.children}</td>
         <td>${report.amount ? report.amount.toLocaleString() + '円' : '-'}</td>
         <td>
-          <select class="form-select form-select-sm" onchange="updateReportStatus(${index}, this.value)">
-            <option value="投稿まち" ${report.processingFlag === '投稿まち' ? 'selected' : ''}>投稿まち</option>
-            <option value="金額確定まち" ${report.processingFlag === '金額確定まち' ? 'selected' : ''}>金額確定まち</option>
-            <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>振込OK</option>
-            <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>振込NG</option>
-            <option value="完了" ${report.processingFlag === '完了' ? 'selected' : ''}>完了</option>
-          </select>
+          <div class="d-flex align-items-center">
+            <span class="status-badge ${getStatusClass(report.processingFlag)}">${report.processingFlag || '投稿まち'}</span>
+            <select class="form-select form-select-sm ms-2" onchange="updateReportStatus(${index}, this.value, this)" style="width: auto;">
+              <option value="投稿まち" ${report.processingFlag === '投稿まち' ? 'selected' : ''}>投稿まち</option>
+              <option value="金額確定まち" ${report.processingFlag === '金額確定まち' ? 'selected' : ''}>金額確定まち</option>
+              <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>振込OK</option>
+              <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>振込NG</option>
+              <option value="完了" ${report.processingFlag === '完了' ? 'selected' : ''}>完了</option>
+            </select>
+          </div>
         </td>
         <td>
           <button class="btn btn-sm btn-outline-primary" onclick="showReportDetails(${index})">
@@ -367,8 +380,11 @@ async function loadFoodDonations() {
       console.log('食品寄付フィルター後:', allFoodDonations.length + '件');
       
       const tbody = document.getElementById('foodDonationsList');
+      // 統計を更新
+      updateFoodDonationStatistics(allFoodDonations);
+      
       if (allFoodDonations.length > 0) {
-        tbody.innerHTML = allFoodDonations.map(donation => `
+        tbody.innerHTML = allFoodDonations.map((donation, index) => `
           <tr>
             <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
             <td>${escapeHtml(donation.siteName)}</td>
@@ -376,7 +392,12 @@ async function loadFoodDonations() {
             <td>${escapeHtml(donation.donor || '-')}</td>
             <td>${escapeHtml(donation.itemName || '-')}</td>
             <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
-            <td>${donation.instagramUrl ? '投稿済' : '未投稿'}</td>
+            <td>
+              ${donation.instagramUrl ? 
+                `<a href="${donation.instagramUrl}" target="_blank" class="btn btn-sm btn-outline-success instagram-btn">投稿済</a>` :
+                `<button class="btn btn-sm btn-primary instagram-btn" onclick="postToInstagram(${index})">投稿</button>`
+              }
+            </td>
           </tr>
         `).join('');
       } else {
@@ -415,6 +436,10 @@ async function loadMoneyDonations() {
       allMoneyDonations = kifuData.money || [];
       
       const tbody = document.getElementById('moneyDonationsList');
+      
+      // 統計を更新
+      updateMoneyDonationStatistics(allMoneyDonations);
+      
       if (allMoneyDonations.length > 0) {
         tbody.innerHTML = allMoneyDonations.map(donation => `
           <tr>
@@ -487,20 +512,38 @@ async function loadLogs() {
 // ユーザー読み込み
 async function loadUsers() {
   try {
-    // 管理画面用の仮のuserIdを設定
-    const result = await apiRequest('getSite?userId=admin');
+    const result = await apiRequest('getAdminKifuData');
     
-    if (result.success || result.data) {
-      const userData = result.data || result.users || [];
+    if (result.success && result.data) {
+      // 寄付データからユーザー情報を抽出
+      const foodUsers = result.data.food || [];
+      const moneyUsers = result.data.money || [];
+      const allUsersData = [...foodUsers, ...moneyUsers];
+      
+      // ユニークなユーザーを抽出
+      const userMap = new Map();
+      allUsersData.forEach(item => {
+        const key = item.userId + '_' + item.siteName;
+        if (!userMap.has(key)) {
+          userMap.set(key, {
+            siteName: item.siteName,
+            nickname: item.nickname,
+            userId: item.userId,
+            lastActivity: item.timestamp
+          });
+        }
+      });
+      
+      allUsers = Array.from(userMap.values());
       const tbody = document.getElementById('usersList');
       
-      if (userData.length > 0) {
-        tbody.innerHTML = userData.map(user => `
+      if (allUsers.length > 0) {
+        tbody.innerHTML = allUsers.map(user => `
           <tr>
-            <td>${escapeHtml(user.siteName || user.name)}</td>
-            <td>${escapeHtml(user.adminName || user.nickname || '-')}</td>
-            <td>${escapeHtml(user.lineId || user.userId || '-')}</td>
-            <td>${user.registeredDate ? new Date(user.registeredDate).toLocaleDateString('ja-JP') : '-'}</td>
+            <td>${escapeHtml(user.siteName)}</td>
+            <td>${escapeHtml(user.nickname)}</td>
+            <td>${escapeHtml(user.userId)}</td>
+            <td>${new Date(user.lastActivity).toLocaleDateString('ja-JP')}</td>
           </tr>
         `).join('');
       } else {
@@ -516,27 +559,26 @@ async function loadUsers() {
 // 拠点読み込み
 async function loadSites() {
   try {
-    // 管理画面用の仮のuserIdを設定
     const result = await apiRequest('getSite?userId=admin');
     
-    if (result.success || result.data) {
-      const siteData = result.data || result.sites || [];
+    if (result.success && result.data) {
+      allSites = result.data || [];
       const tbody = document.getElementById('sitesList');
       
-      if (siteData.length > 0) {
-        tbody.innerHTML = siteData.map(site => `
+      if (allSites.length > 0) {
+        tbody.innerHTML = allSites.map(site => `
           <tr>
             <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.siteName || site.name)}" 
-                     onchange="updateSite('${escapeHtml(site.siteName || site.name)}', 'name', this.value)" readonly>
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site['拠点名'] || site.siteName || site.name)}" 
+                     onchange="updateSite('${escapeHtml(site['拠点名'] || site.siteName || site.name)}', 'name', this.value)" readonly>
             </td>
             <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.webSite || site.website || '')}" 
-                     onchange="updateSite('${escapeHtml(site.siteName || site.name)}', 'webSite', this.value)">
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site['web'] || site.webSite || site.website || '')}" 
+                     onchange="updateSite('${escapeHtml(site['拠点名'] || site.siteName || site.name)}', 'webSite', this.value)">
             </td>
             <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site.transferDestination || site.account || '')}" 
-                     onchange="updateSite('${escapeHtml(site.siteName || site.name)}', 'transferDestination', this.value)">
+              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site['振込口座'] || site.transferDestination || site.account || '')}" 
+                     onchange="updateSite('${escapeHtml(site['拠点名'] || site.siteName || site.name)}', 'transferDestination', this.value)">
             </td>
             <td>
               <button class="btn btn-sm btn-primary" onclick="toggleEdit(this)">
@@ -593,15 +635,38 @@ async function updateSite(siteName, field, value) {
   }
 }
 
-// レポートステータス更新
-async function updateReportStatus(reportIndex, newStatus) {
-  if (!confirm(`ステータスを「${newStatus}」に変更しますか？`)) {
-    filterReports(); // 元に戻す
-    return;
+// ステータス表示クラス取得
+function getStatusClass(status) {
+  switch(status) {
+    case '投稿まち': return 'status-waiting';
+    case '金額確定まち': return 'status-amount-waiting';
+    case '振込OK': return 'status-ok';
+    case '振込NG': return 'status-ng';
+    case '完了': return 'status-completed';
+    default: return 'status-waiting';
   }
-  
+}
+
+// レポートステータス更新
+async function updateReportStatus(reportIndex, newStatus, selectElement) {
   const report = allReports[reportIndex];
   if (!report) return;
+  
+  const oldStatus = report.processingFlag || '投稿まち';
+  
+  // 同じステータスの場合は何もしない
+  if (oldStatus === newStatus) return;
+  
+  // 確認ダイアログ
+  const confirmMessage = `${new Date(report.timestamp).toLocaleDateString('ja-JP')} ${report.siteName} ${report.nickname || report.userId} ${new Date(report.eventDate).toLocaleDateString('ja-JP')} ${report.eventType} ${report.amount ? report.amount.toLocaleString() + '円' : '金額未確定'}
+
+この投稿のステータスを「${oldStatus}」から「${newStatus}」へ変更します。よろしいですか？`;
+  
+  if (!confirm(confirmMessage)) {
+    // キャンセルされた場合、selectの値を元に戻す
+    selectElement.value = oldStatus;
+    return;
+  }
   
   try {
     const result = await apiRequest('updateReportStatus', 'POST', {
@@ -621,8 +686,10 @@ async function updateReportStatus(reportIndex, newStatus) {
     }
   } catch (error) {
     showError('更新に失敗しました: ' + error.message);
-    filterReports(); // 元に戻す
+    selectElement.value = oldStatus; // 元に戻す
+    filterReports(); // 表示を更新
   }
+}
 }
 
 // ユーティリティ関数
@@ -652,3 +719,125 @@ setInterval(() => {
     }
   }
 }, 60000); // 1分ごとにチェック
+
+// 食品寄付統計更新
+function updateFoodDonationStatistics(donations) {
+  const now = new Date();
+  const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  
+  const totalCount = donations.length;
+  const currentMonthCount = donations.filter(donation => {
+    const donationDate = new Date(donation.timestamp);
+    const donationMonth = donationDate.getFullYear() + '-' + String(donationDate.getMonth() + 1).padStart(2, '0');
+    return donationMonth === currentMonth;
+  }).length;
+  
+  document.getElementById('totalFoodDonations').textContent = totalCount;
+  document.getElementById('currentMonthFoodDonations').textContent = currentMonthCount;
+}
+
+// 金銭寄付統計更新
+function updateMoneyDonationStatistics(donations) {
+  const now = new Date();
+  const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  
+  const totalCount = donations.length;
+  const totalAmount = donations.reduce((sum, donation) => sum + (donation.amount || 0), 0);
+  
+  const currentMonthDonations = donations.filter(donation => {
+    const donationDate = new Date(donation.timestamp);
+    const donationMonth = donationDate.getFullYear() + '-' + String(donationDate.getMonth() + 1).padStart(2, '0');
+    return donationMonth === currentMonth;
+  });
+  
+  const currentMonthCount = currentMonthDonations.length;
+  const currentMonthAmount = currentMonthDonations.reduce((sum, donation) => sum + (donation.amount || 0), 0);
+  
+  document.getElementById('totalMoneyAmount').textContent = totalAmount.toLocaleString() + '円';
+  document.getElementById('totalMoneyDonations').textContent = totalCount;
+  document.getElementById('currentMonthMoneyAmount').textContent = currentMonthAmount.toLocaleString() + '円';
+  document.getElementById('currentMonthMoneyDonations').textContent = currentMonthCount;
+}
+
+// 食品寄付フィルター
+function filterFoodDonations() {
+  const monthFilter = document.getElementById('foodMonthFilter').value;
+  
+  let filteredDonations = allFoodDonations;
+  
+  if (monthFilter) {
+    filteredDonations = filteredDonations.filter(donation => {
+      const donationDate = new Date(donation.timestamp);
+      const donationMonth = donationDate.getFullYear() + '-' + String(donationDate.getMonth() + 1).padStart(2, '0');
+      return donationMonth === monthFilter;
+    });
+  }
+  
+  const tbody = document.getElementById('foodDonationsList');
+  if (filteredDonations.length > 0) {
+    tbody.innerHTML = filteredDonations.map((donation, index) => `
+      <tr>
+        <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
+        <td>${escapeHtml(donation.siteName)}</td>
+        <td>${escapeHtml(donation.nickname || donation.userId)}</td>
+        <td>${escapeHtml(donation.donor || '-')}</td>
+        <td>${escapeHtml(donation.itemName || '-')}</td>
+        <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
+        <td>
+          ${donation.instagramUrl ? 
+            `<a href="${donation.instagramUrl}" target="_blank" class="btn btn-sm btn-outline-success instagram-btn">投稿済</a>` :
+            `<button class="btn btn-sm btn-primary instagram-btn" onclick="postToInstagram(${index})">投稿</button>`
+          }
+        </td>
+      </tr>
+    `).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// 金銭寄付フィルター
+function filterMoneyDonations() {
+  const monthFilter = document.getElementById('moneyMonthFilter').value;
+  
+  let filteredDonations = allMoneyDonations;
+  
+  if (monthFilter) {
+    filteredDonations = filteredDonations.filter(donation => {
+      const donationDate = new Date(donation.timestamp);
+      const donationMonth = donationDate.getFullYear() + '-' + String(donationDate.getMonth() + 1).padStart(2, '0');
+      return donationMonth === monthFilter;
+    });
+  }
+  
+  const tbody = document.getElementById('moneyDonationsList');
+  if (filteredDonations.length > 0) {
+    tbody.innerHTML = filteredDonations.map(donation => `
+      <tr>
+        <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
+        <td>${escapeHtml(donation.siteName)}</td>
+        <td>${escapeHtml(donation.nickname || donation.userId)}</td>
+        <td>${escapeHtml(donation.donor || '-')}</td>
+        <td>${donation.amount ? donation.amount.toLocaleString() + '円' : '-'}</td>
+        <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
+      </tr>
+    `).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// Instagram投稿処理
+function postToInstagram(donationIndex) {
+  const donation = allFoodDonations[donationIndex];
+  if (!donation) return;
+  
+  const instagramUrl = prompt(`Instagram投稿URLを入力してください:\n\n寄付品名: ${donation.itemName}\n寄付元: ${donation.donor}`);
+  
+  if (instagramUrl && instagramUrl.trim()) {
+    // 実際の処理ではGASにデータを送信
+    donation.instagramUrl = instagramUrl.trim();
+    loadFoodDonations(); // 表示を更新
+    showSuccess('Instagram投稿URLを設定しました');
+  }
+}

@@ -168,6 +168,38 @@
           <!-- 寄付報告（食品） -->
           <div id="food-donations" class="section" style="display:none;">
             <h2>寄付報告（食品）</h2>
+            
+            <!-- ダッシュボード統計 -->
+            <div class="row mt-3 mb-4">
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">累計寄付件数</h6>
+                    <h4 class="text-primary" id="totalFoodDonations">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">当月の寄付件数</h6>
+                    <h4 class="text-success" id="currentMonthFoodDonations">-</h4>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- フィルター -->
+            <div class="row mb-3">
+              <div class="col-md-3">
+                <label for="foodMonthFilter" class="form-label">対象月</label>
+                <select id="foodMonthFilter" class="form-select">
+                  <option value="">全て</option>
+                  <!-- 動的に生成 -->
+                </select>
+              </div>
+            </div>
+
             <div class="table-container mt-4">
               <div class="loading">
                 <div class="spinner-border" role="status">
@@ -185,7 +217,7 @@
                     <th>寄付元</th>
                     <th>品名</th>
                     <th>公開/非公開</th>
-                    <th>SNS投稿</th>
+                    <th>Instagram投稿</th>
                   </tr>
                 </thead>
                 <tbody id="foodDonationsList">
@@ -197,6 +229,54 @@
           <!-- 寄付報告（金銭） -->
           <div id="money-donations" class="section" style="display:none;">
             <h2>寄付報告（金銭）</h2>
+            
+            <!-- ダッシュボード統計 -->
+            <div class="row mt-3 mb-4">
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">累計寄付金額</h6>
+                    <h4 class="text-primary" id="totalMoneyAmount">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">累計寄付件数</h6>
+                    <h4 class="text-info" id="totalMoneyDonations">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">当月の寄付金額</h6>
+                    <h4 class="text-success" id="currentMonthMoneyAmount">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">当月の寄付件数</h6>
+                    <h4 class="text-warning" id="currentMonthMoneyDonations">-</h4>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- フィルター -->
+            <div class="row mb-3">
+              <div class="col-md-3">
+                <label for="moneyMonthFilter" class="form-label">対象月</label>
+                <select id="moneyMonthFilter" class="form-select">
+                  <option value="">全て</option>
+                  <!-- 動的に生成 -->
+                </select>
+              </div>
+            </div>
+
             <div class="table-container mt-4">
               <div class="loading">
                 <div class="spinner-border" role="status">
