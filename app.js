@@ -223,7 +223,7 @@ async function loadReports() {
   table.style.display = 'none';
   
   try {
-    const result = await apiRequest('getInternalReports');
+    const result = await apiRequest('getAdminReports');
     
     if (result.success || result.data) {
       allReports = result.data || result.reports || [];
@@ -355,7 +355,7 @@ async function loadFoodDonations() {
   table.style.display = 'none';
   
   try {
-    const result = await apiRequest('getKifuReports');
+    const result = await apiRequest('getAdminKifuData');
     
     if (result.success || result.data) {
       const kifuData = result.data || result.kifu || [];
@@ -407,7 +407,7 @@ async function loadMoneyDonations() {
   table.style.display = 'none';
   
   try {
-    const result = await apiRequest('getKifuReports');
+    const result = await apiRequest('getAdminKifuData');
     
     if (result.success || result.data) {
       const kifuData = result.data || result.kifu || [];
