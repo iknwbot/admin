@@ -7,6 +7,10 @@ let allLogs = [];
 let allUsers = [];
 let allSites = [];
 
+// ソート用のグローバル変数
+window.sortColumn = 'timestamp';
+window.sortDirection = 'desc';
+
 // 初期化
 window.onload = async function() {
   checkAuth();
@@ -256,6 +260,9 @@ async function loadReports() {
 function filterReports() {
   const monthFilter = document.getElementById('monthFilter').value;
   const statusFilter = document.getElementById('statusFilter').value;
+  const siteFilter = document.getElementById('siteFilter')?.value;
+  
+  console.log('フィルター値:', { monthFilter, statusFilter, siteFilter });
   
   let filteredReports = allReports;
   
@@ -273,8 +280,21 @@ function filterReports() {
     filteredReports = filteredReports.filter(report => report.processingFlag === statusFilter);
   }
   
-  // 統計更新
-  updateStatistics(filteredReports);
+  // 拠点フィルター
+  if (siteFilter) {
+    console.log('拠点フィルター適用前:', filteredReports.length + '件');
+    filteredReports = filteredReports.filter(report => {
+      console.log('比較:', report.siteName, '===', siteFilter, report.siteName === siteFilter);
+      return report.siteName === siteFilter;
+    });
+    console.log('拠点フィルター適用後:', filteredReports.length + '件');
+  }
+  
+  // ソート適用
+  filteredReports = sortReportsArray(filteredReports);
+  
+  // 統計更新（フィルターに関係なく対象月の全データ）
+  updateStatistics();
   
   // テーブル更新
   const tbody = document.getElementById('reportsList');
@@ -287,7 +307,7 @@ function filterReports() {
         <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
         <td>${escapeHtml(report.eventType)}</td>
         <td>大人:${report.adults} 子:${report.children}</td>
-        <td>${report.amount ? '¥' + report.amount.toLocaleString() : '-'}</td>
+        <td>${report.amount ? report.amount.toLocaleString() + '円' : '-'}</td>
         <td>
           <span class="status-badge ${getStatusClass(report.processingFlag)} clickable" 
                 onclick="showStatusChangeModal(${index})" 
@@ -328,7 +348,7 @@ window.showReportDetails = function(index) {
         <h6>参加者・金額</h6>
         <p><strong>大人:</strong> ${report.adults}人</p>
         <p><strong>子ども:</strong> ${report.children}人</p>
-        <p><strong>請求額:</strong> ${report.amount ? '¥' + report.amount.toLocaleString() : '未確定'}</p>
+        <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString() + '円' : '未確定'}</p>
         <p><strong>ステータス:</strong> ${escapeHtml(report.processingFlag || '投稿まち')}</p>
       </div>
     </div>
@@ -447,7 +467,7 @@ async function loadMoneyDonations() {
             <td>${escapeHtml(donation.siteName)}</td>
             <td>${escapeHtml(donation.nickname || donation.userId)}</td>
             <td>${escapeHtml(donation.donor || '-')}</td>
-            <td>${donation.amount ? '¥' + parseInt(donation.amount).toLocaleString() : '-'}</td>
+            <td>${donation.amount ? parseInt(donation.amount).toLocaleString() + '円' : '-'}</td>
             <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
           </tr>
         `).join('');
@@ -651,7 +671,7 @@ function showStatusChangeModal(reportIndex) {
           <tr><th>投稿者</th><td>${escapeHtml(report.nickname || report.userId)}</td></tr>
           <tr><th>開催日</th><td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td></tr>
           <tr><th>開催タイプ</th><td>${escapeHtml(report.eventType)}</td></tr>
-          <tr><th>金額</th><td>${report.amount ? '¥' + report.amount.toLocaleString() : '金額未確定'}</td></tr>
+          <tr><th>金額</th><td>${report.amount ? report.amount.toLocaleString() + '円' : '金額未確定'}</td></tr>
         </table>
       </div>
     </div>
@@ -933,7 +953,7 @@ function updateMoneyDonationStatistics(donations) {
   };
   
   if (elements.totalAmount) {
-    elements.totalAmount.textContent = '¥' + totalAmount.toLocaleString();
+    elements.totalAmount.textContent = totalAmount.toLocaleString() + '円';
   } else {
     console.error('totalMoneyAmount要素が見つかりません');
   }
@@ -945,7 +965,7 @@ function updateMoneyDonationStatistics(donations) {
   }
   
   if (elements.currentAmount) {
-    elements.currentAmount.textContent = '¥' + currentMonthAmount.toLocaleString();
+    elements.currentAmount.textContent = currentMonthAmount.toLocaleString() + '円';
   } else {
     console.error('currentMonthMoneyAmount要素が見つかりません');
   }
