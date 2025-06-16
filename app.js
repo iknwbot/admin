@@ -286,7 +286,7 @@ function filterReports() {
         <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
         <td>${escapeHtml(report.eventType)}</td>
         <td>大人:${report.adults} 子:${report.children}</td>
-        <td>${report.amount ? report.amount.toLocaleString() + '円' : '-'}</td>
+        <td>${report.amount ? report.amount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '-'}</td>
         <td>
           <span class="status-badge ${getStatusClass(report.processingFlag)} clickable" 
                 onclick="showStatusChangeModal(${index})" 
@@ -327,7 +327,7 @@ function showReportDetails(index) {
         <h6>参加者・金額</h6>
         <p><strong>大人:</strong> ${report.adults}人</p>
         <p><strong>子ども:</strong> ${report.children}人</p>
-        <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString() + '円' : '未確定'}</p>
+        <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '未確定'}</p>
         <p><strong>ステータス:</strong> ${escapeHtml(report.processingFlag || '投稿まち')}</p>
       </div>
     </div>
@@ -446,7 +446,7 @@ async function loadMoneyDonations() {
             <td>${escapeHtml(donation.siteName)}</td>
             <td>${escapeHtml(donation.nickname || donation.userId)}</td>
             <td>${escapeHtml(donation.donor || '-')}</td>
-            <td>${donation.amount ? donation.amount.toLocaleString() + '円' : '-'}</td>
+            <td>${donation.amount ? parseInt(donation.amount).toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '-'}</td>
             <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
           </tr>
         `).join('');
@@ -650,7 +650,7 @@ function showStatusChangeModal(reportIndex) {
           <tr><th>投稿者</th><td>${escapeHtml(report.nickname || report.userId)}</td></tr>
           <tr><th>開催日</th><td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td></tr>
           <tr><th>開催タイプ</th><td>${escapeHtml(report.eventType)}</td></tr>
-          <tr><th>金額</th><td>${report.amount ? report.amount.toLocaleString() + '円' : '金額未確定'}</td></tr>
+          <tr><th>金額</th><td>${report.amount ? report.amount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' }) : '金額未確定'}</td></tr>
         </table>
       </div>
     </div>
@@ -853,7 +853,7 @@ function updateMoneyDonationStatistics(donations) {
   };
   
   if (elements.totalAmount) {
-    elements.totalAmount.textContent = totalAmount.toLocaleString() + '円';
+    elements.totalAmount.textContent = totalAmount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' });
   } else {
     console.error('totalMoneyAmount要素が見つかりません');
   }
@@ -865,7 +865,7 @@ function updateMoneyDonationStatistics(donations) {
   }
   
   if (elements.currentAmount) {
-    elements.currentAmount.textContent = currentMonthAmount.toLocaleString() + '円';
+    elements.currentAmount.textContent = currentMonthAmount.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' });
   } else {
     console.error('currentMonthMoneyAmount要素が見つかりません');
   }
