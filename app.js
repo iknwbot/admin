@@ -16,6 +16,21 @@ window.onload = async function() {
   checkAuth();
   initializeFilters();
   await initializeSiteFilter();
+  
+  // グローバル関数を確実に設定
+  window.applyFilters = function() {
+    filterReports();
+  };
+  
+  window.clearFilters = function() {
+    document.getElementById('monthFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    const siteFilter = document.getElementById('siteFilter');
+    if (siteFilter) {
+      siteFilter.value = '';
+    }
+    filterReports();
+  };
 };
 
 // フィルター初期化
@@ -277,21 +292,24 @@ async function loadReports() {
   }
 }
 
-// フィルター適用関数（手動検索用）
-window.applyFilters = function() {
-  filterReports();
-}
-
-// フィルタークリア関数
-window.clearFilters = function() {
-  document.getElementById('monthFilter').value = '';
-  document.getElementById('statusFilter').value = '';
-  const siteFilter = document.getElementById('siteFilter');
-  if (siteFilter) {
-    siteFilter.value = '';
-  }
-  filterReports();
-}
+// DOMContentLoadedでも関数を設定（フォールバック）
+document.addEventListener('DOMContentLoaded', function() {
+  window.applyFilters = function() {
+    console.log('applyFilters called');
+    filterReports();
+  };
+  
+  window.clearFilters = function() {
+    console.log('clearFilters called');
+    document.getElementById('monthFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    const siteFilter = document.getElementById('siteFilter');
+    if (siteFilter) {
+      siteFilter.value = '';
+    }
+    filterReports();
+  };
+});
 
 // フィルター適用
 function filterReports() {
