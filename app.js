@@ -288,16 +288,12 @@ function filterReports() {
         <td>大人:${report.adults} 子:${report.children}</td>
         <td>${report.amount ? report.amount.toLocaleString() + '円' : '-'}</td>
         <td>
-          <div class="d-flex align-items-center">
-            <span class="status-badge ${getStatusClass(report.processingFlag)}">${report.processingFlag || '投稿まち'}</span>
-            <select class="form-select form-select-sm ms-2" onchange="updateReportStatus(${index}, this.value, this)" style="width: auto;">
-              <option value="投稿まち" ${report.processingFlag === '投稿まち' ? 'selected' : ''}>投稿まち</option>
-              <option value="金額確定まち" ${report.processingFlag === '金額確定まち' ? 'selected' : ''}>金額確定まち</option>
-              <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>振込OK</option>
-              <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>振込NG</option>
-              <option value="完了" ${report.processingFlag === '完了' ? 'selected' : ''}>完了</option>
-            </select>
-          </div>
+          <span class="status-badge ${getStatusClass(report.processingFlag)} clickable" 
+                onclick="showStatusChangeModal(${index})" 
+                style="cursor: pointer;"
+                title="クリックしてステータスを変更">
+            ${report.processingFlag || '投稿まち'}
+          </span>
         </td>
         <td>
           <button class="btn btn-sm btn-outline-primary" onclick="showReportDetails(${index})">
@@ -599,13 +595,6 @@ function toggleEdit(button) {
   }
 }
 
-// 確認ダイアログのイベントリスナー追加
-document.addEventListener('DOMContentLoaded', function() {
-  const confirmButton = document.getElementById('confirmStatusChange');
-  if (confirmButton) {
-    confirmButton.addEventListener('click', executeStatusChange);
-  }
-});
 
 // サイト情報更新
 async function updateSite(siteName, field, value) {
@@ -642,29 +631,15 @@ function getStatusClass(status) {
 // グローバル変数
 let pendingStatusChange = null;
 
-// レポートステータス更新
-async function updateReportStatus(reportIndex, newStatus, selectElement) {
-  const report = allReports[reportIndex];
-  if (!report) return;
-  
-  const oldStatus = report.processingFlag || '投稿まち';
-  
-  // 同じステータスの場合は何もしない
-  if (oldStatus === newStatus) return;
-  
-  // selectの値を一旦元に戻す
-  selectElement.value = oldStatus;
-  
-  // モーダルで確認
-  showStatusChangeConfirmation(reportIndex, oldStatus, newStatus, selectElement);
-}
 
-// ステータス変更確認モーダル表示
-function showStatusChangeConfirmation(reportIndex, oldStatus, newStatus, selectElement) {
+// ステータス変更モーダル表示（バッジクリック用）
+function showStatusChangeModal(reportIndex) {
   const report = allReports[reportIndex];
   if (!report) return;
   
+  const currentStatus = report.processingFlag || '投稿まち';
   const modalBody = document.getElementById('statusChangeModalBody');
+  
   modalBody.innerHTML = `
     <div class="row">
       <div class="col-12">
@@ -681,9 +656,59 @@ function showStatusChangeConfirmation(reportIndex, oldStatus, newStatus, selectE
     </div>
     <div class="row mt-3">
       <div class="col-12">
+        <div class="mb-3">
+          <label class="form-label">現在のステータス</label>
+          <div>
+            <span class="status-badge ${getStatusClass(currentStatus)}">${currentStatus}</span>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">新しいステータスを選択</label>
+          <div class="d-grid gap-2">
+            <button class="btn btn-outline-warning" onclick="confirmStatusChange(${reportIndex}, '投稿まち')">投稿まち</button>
+            <button class="btn btn-outline-info" onclick="confirmStatusChange(${reportIndex}, '金額確定まち')">金額確定まち</button>
+            <button class="btn btn-outline-success" onclick="confirmStatusChange(${reportIndex}, '振込OK')">振込OK</button>
+            <button class="btn btn-outline-danger" onclick="confirmStatusChange(${reportIndex}, '振込NG')">振込NG</button>
+            <button class="btn btn-outline-secondary" onclick="confirmStatusChange(${reportIndex}, '完了')">完了</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // モーダル表示
+  const modal = new bootstrap.Modal(document.getElementById('statusChangeModal'));
+  modal.show();
+}
+
+// ステータス変更確認
+function confirmStatusChange(reportIndex, newStatus) {
+  const report = allReports[reportIndex];
+  if (!report) return;
+  
+  const oldStatus = report.processingFlag || '投稿まち';
+  
+  // 同じステータスの場合は何もしない
+  if (oldStatus === newStatus) {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('statusChangeModal'));
+    if (modal) modal.hide();
+    return;
+  }
+  
+  // ペンディング情報を保存
+  pendingStatusChange = {
+    reportIndex,
+    newStatus
+  };
+  
+  // 確認メッセージを表示
+  const modalBody = document.getElementById('statusChangeModalBody');
+  modalBody.innerHTML += `
+    <div class="row mt-3">
+      <div class="col-12">
         <div class="alert alert-warning">
-          <strong>ステータス変更確認</strong><br>
-          この投稿のステータスを<br>
+          <strong>変更を確定しますか？</strong><br>
+          ステータスを<br>
           <span class="status-badge ${getStatusClass(oldStatus)}">${oldStatus}</span> から 
           <span class="status-badge ${getStatusClass(newStatus)}">${newStatus}</span> へ変更します。
         </div>
@@ -691,16 +716,12 @@ function showStatusChangeConfirmation(reportIndex, oldStatus, newStatus, selectE
     </div>
   `;
   
-  // ペンディング情報を保存
-  pendingStatusChange = {
-    reportIndex,
-    newStatus,
-    selectElement
-  };
-  
-  // モーダル表示
-  const modal = new bootstrap.Modal(document.getElementById('statusChangeModal'));
-  modal.show();
+  // ボタンを変更
+  const footer = document.querySelector('#statusChangeModal .modal-footer');
+  footer.innerHTML = `
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+    <button type="button" class="btn btn-primary" onclick="executeStatusChange()">変更を確定</button>
+  `;
 }
 
 // ステータス変更実行
@@ -721,7 +742,6 @@ async function executeStatusChange() {
     if (result.success) {
       // ローカルデータを更新
       allReports[reportIndex].processingFlag = newStatus;
-      selectElement.value = newStatus; // selectの値を更新
       filterReports(); // 表示を更新
       showSuccess('ステータスを更新しました');
     } else {
