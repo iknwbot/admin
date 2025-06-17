@@ -603,12 +603,25 @@ async function loadLogs() {
             timestamp = new Date(firstValue);
           }
           
-          // 2番目以降から種類と詳細を抽出
+          // 古いログ形式の場合、2番目のキーが実際のログメッセージ
           let typeKey = keys[1];
           let typeValue = log[typeKey];
           
-          // 3番目があれば詳細
-          let detailsValue = keys[2] ? log[keys[2]] : '';
+          // 3番目があれば詳細（新形式）、なければ2番目がメッセージ（旧形式）
+          let detailsValue = '';
+          if (keys.length >= 3 && keys[2]) {
+            // 新しい4列形式: タイムスタンプ, 種類, カテゴリ, 詳細
+            detailsValue = log[keys[2]]; // 3番目はカテゴリ
+            if (keys.length >= 4) {
+              details = log[keys[3]]; // 4番目が詳細
+            } else {
+              details = typeValue; // フォールバック
+            }
+          } else {
+            // 古い2列形式: タイムスタンプ, ログメッセージ
+            details = typeValue; // 2番目がログメッセージ全体
+            detailsValue = typeValue;
+          }
           
           // 種類を判定
           if (typeValue === 'SUCCESS' || typeKey.includes('✅')) {
@@ -622,7 +635,7 @@ async function loadLogs() {
           }
           
           // カテゴリを推測
-          const allText = (typeKey + ' ' + detailsValue).toLowerCase();
+          const allText = (typeKey + ' ' + detailsValue + ' ' + details).toLowerCase();
           if (allText.includes('活動報告') || allText.includes('report')) {
             category = '活動報告';
           } else if (allText.includes('寄付') || allText.includes('donation')) {
@@ -637,13 +650,15 @@ async function loadLogs() {
             category = '管理画面';
           }
           
-          // 詳細メッセージを設定
-          if (detailsValue) {
-            details = detailsValue;
-          } else if (typeKey && typeKey !== '') {
-            details = typeKey;
-          } else {
-            details = 'ログメッセージ';
+          // 詳細メッセージを最終確認（空の場合のフォールバック）
+          if (!details || details === '') {
+            if (detailsValue && detailsValue !== '') {
+              details = detailsValue;
+            } else if (typeKey && typeKey !== '') {
+              details = typeKey;
+            } else {
+              details = 'ログメッセージ';
+            }
           }
           
           const converted = {
