@@ -559,6 +559,10 @@ async function loadLogs() {
     if (result.success || result.data) {
       allLogs = result.data || result.logs || [];
       
+      // デバッグ: ログデータの形式を確認
+      console.log('Raw logs:', allLogs);
+      console.log('First log:', allLogs[0]);
+      
       // 最近30日のログのみを取得
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -567,6 +571,8 @@ async function loadLogs() {
         const logDate = new Date(log['タイムスタンプ'] || log.timestamp);
         return logDate >= thirtyDaysAgo;
       });
+      
+      console.log('Filtered logs:', allLogs);
       
       currentLogPage = 1;
       updateLogStatistics();
@@ -2068,6 +2074,8 @@ function applyLogFilters() {
   }
   
   filteredLogs = filtered;
+  console.log('Applying filters:', { typeFilter, categoryFilter, dateFilter });
+  console.log('Filtered logs result:', filteredLogs);
   currentLogPage = 1;
   renderLogTable();
   updateLogPagination();
@@ -2087,6 +2095,15 @@ function renderLogTable() {
   const startIndex = (currentLogPage - 1) * logsPerPage;
   const endIndex = startIndex + logsPerPage;
   const pageData = filteredLogs.slice(startIndex, endIndex);
+  
+  console.log('Rendering table:', { 
+    totalFiltered: filteredLogs.length, 
+    currentPage: currentLogPage, 
+    startIndex, 
+    endIndex, 
+    pageDataLength: pageData.length,
+    pageData: pageData 
+  });
   
   if (pageData.length > 0) {
     tbody.innerHTML = pageData.map(log => {
