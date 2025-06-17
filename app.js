@@ -354,7 +354,15 @@ function filterReports() {
   // テーブル更新
   const tbody = document.getElementById('reportsList');
   if (filteredReports.length > 0) {
-    tbody.innerHTML = filteredReports.map((report, index) => `
+    tbody.innerHTML = filteredReports.map((report, index) => {
+      // 元のallReports配列でのインデックスを取得
+      const originalIndex = allReports.findIndex(r => 
+        r.timestamp === report.timestamp && 
+        r.siteName === report.siteName && 
+        r.userId === report.userId
+      );
+      
+      return `
       <tr>
         <td>${new Date(report.timestamp).toLocaleDateString('ja-JP')}</td>
         <td>${escapeHtml(report.siteName)}</td>
@@ -364,20 +372,24 @@ function filterReports() {
         <td>大人:${report.adults} 子:${report.children}</td>
         <td>${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
         <td>
-          <span class="status-badge ${getStatusClass(report.processingFlag)} clickable" 
-                onclick="showStatusChangeModal(${index})" 
-                style="cursor: pointer;"
-                title="クリックしてステータスを変更">
-            ${report.processingFlag || '投稿まち'}
-          </span>
+          <select class="form-select form-select-sm status-select" 
+                  onchange="changeReportStatus(this, ${originalIndex})"
+                  data-original-status="${report.processingFlag || '投稿まち'}">
+            <option value="投稿まち" ${(report.processingFlag || '投稿まち') === '投稿まち' ? 'selected' : ''}>投稿まち</option>
+            <option value="金額確定まち" ${report.processingFlag === '金額確定まち' ? 'selected' : ''}>金額確定まち</option>
+            <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>振込OK</option>
+            <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>振込NG</option>
+            <option value="完了" ${report.processingFlag === '完了' ? 'selected' : ''}>完了</option>
+          </select>
         </td>
         <td>
-          <button class="btn btn-sm btn-outline-primary" onclick="showReportDetails(${index})">
+          <button class="btn btn-sm btn-outline-primary" onclick="showReportDetails(${originalIndex})">
             詳細
           </button>
         </td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
   } else {
     tbody.innerHTML = '<tr><td colspan="9" class="text-center">データがありません</td></tr>';
   }
@@ -733,6 +745,49 @@ async function executeStatusChange() {
     const modal = bootstrap.Modal.getInstance(document.getElementById('statusChangeModal'));
     if (modal) modal.hide();
     pendingStatusChange = null;
+  }
+}
+
+// シンプルなステータス変更（プルダウン用）
+async function changeReportStatus(selectElement, reportIndex) {
+  const newStatus = selectElement.value;
+  const originalStatus = selectElement.getAttribute('data-original-status');
+  const report = allReports[reportIndex];
+  
+  if (!report) {
+    showError('レポートが見つかりません');
+    selectElement.value = originalStatus; // 元に戻す
+    return;
+  }
+  
+  if (newStatus === originalStatus) {
+    return; // 変更なし
+  }
+  
+  try {
+    const result = await apiRequest('updateReportStatus', 'POST', {
+      action: 'updateReportStatus',
+      timestamp: report.timestamp,
+      siteName: report.siteName,
+      status: newStatus
+    });
+    
+    if (result.success) {
+      // ローカルデータを更新
+      allReports[reportIndex].processingFlag = newStatus;
+      selectElement.setAttribute('data-original-status', newStatus);
+      
+      // 統計を更新
+      updateStatistics();
+      
+      showSuccess(`ステータスを「${newStatus}」に更新しました`);
+    } else {
+      throw new Error(result.error || '更新に失敗しました');
+    }
+  } catch (error) {
+    showError('更新に失敗しました: ' + error.message);
+    // エラー時は元の値に戻す
+    selectElement.value = originalStatus;
   }
 }
 
