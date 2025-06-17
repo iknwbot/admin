@@ -1175,44 +1175,42 @@ function renderTransferTable(filteredData) {
                 </tbody>
               </table>
             ` : `
-              <div class="alert alert-warning text-center">
-                <i class="bi bi-exclamation-triangle"></i> 活動報告なし
+              <div class="text-center text-muted">
+                活動報告なし
               </div>
             `}
           </div>
           
           <!-- 合計と振込情報 -->
-          <div class="row align-items-center">
-            <div class="col-12 text-end">
-              <div class="mb-2">
-                <strong>合計振込金額: </strong>
-                <span class="h5 text-primary">${Math.floor(totalAmount).toLocaleString()}円</span>
-                <span class="ms-3"><strong>活動件数: </strong><span class="h5 text-info">${activityCount}件</span></span>
-              </div>
-              <div class="mb-2">
-                <strong>振込先口座: </strong>
-                <span class="text-muted">${escapeHtml(siteData.account)}</span>
-              </div>
-              <div>
-                ${hasTransferData ? 
-                  `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${totalAmount}, ${activityCount})">
-                    <i class="bi bi-bank"></i> 振込完了
-                  </button>` :
-                  isCompleted ?
-                    `<button class="btn btn-secondary" disabled>
-                      <i class="bi bi-check-circle"></i> 完了
+          ${hasActivity ? `
+            <div class="row align-items-center">
+              <div class="col-12 text-end">
+                <div class="mb-2">
+                  <strong>合計振込金額: </strong>
+                  <span class="h5 text-primary">${Math.floor(totalAmount).toLocaleString()}円</span>
+                  <span class="ms-3"><strong>活動件数: </strong><span class="h5 text-info">${activityCount}件</span></span>
+                </div>
+                <div class="mb-2">
+                  <strong>振込先口座: </strong>
+                  <span class="text-muted">${escapeHtml(siteData.account)}</span>
+                </div>
+                <div>
+                  ${hasTransferData ? 
+                    `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${totalAmount}, ${activityCount})">
+                      <i class="bi bi-bank"></i> 振込する
                     </button>` :
-                    !hasActivity ?
-                      `<button class="btn btn-warning" onclick="showCheckRequired('${escapeHtml(siteData.name)}')">
-                        <i class="bi bi-exclamation-triangle"></i> 活動なし
+                    isCompleted ?
+                      `<button class="btn btn-secondary" disabled>
+                        <i class="bi bi-check-circle"></i> 完了
                       </button>` :
                       `<button class="btn btn-danger" onclick="showCheckRequired('${escapeHtml(siteData.name)}')">
                         <i class="bi bi-exclamation-triangle"></i> 要確認
                       </button>`
-                }
+                  }
+                </div>
               </div>
             </div>
-          </div>
+          ` : ''}
         </div>
       </div>
     `;
