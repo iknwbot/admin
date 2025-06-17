@@ -218,6 +218,9 @@ function showSection(sectionName, targetElement = null) {
     case 'transfer-confirm':
       loadTransferConfirm();
       break;
+    case 'backup':
+      loadBackup();
+      break;
   }
 }
 
@@ -2161,3 +2164,273 @@ async function updateSiteField(siteName, field, value) {
   
   return result;
 }
+
+// バックアップ管理機能
+let allBackups = [];
+
+// バックアップページ読み込み
+async function loadBackup() {
+  showBackupLoading(true);
+  
+  try {
+    await refreshBackupList();
+    showBackupLoading(false);
+  } catch (error) {
+    showBackupError('バックアップデータの読み込みに失敗しました: ' + error.message);
+    showBackupLoading(false);
+  }
+}
+
+// バックアップ一覧更新
+async function refreshBackupList() {
+  try {
+    showBackupLoading(true);
+    
+    // バックアップ一覧を取得
+    const result = await apiRequest('getBackupList', 'GET');
+    
+    if (result.success) {
+      allBackups = result.backups || [];
+      updateBackupStatistics();
+      renderBackupTable();
+      
+      document.getElementById('backupTable').style.display = 'table';
+    } else {
+      throw new Error(result.message || 'バックアップ一覧の取得に失敗しました');
+    }
+    
+  } catch (error) {
+    showBackupError('バックアップ一覧の取得に失敗しました: ' + error.message);
+  } finally {
+    showBackupLoading(false);
+  }
+}
+
+// バックアップ統計更新
+function updateBackupStatistics() {
+  // 最新バックアップ
+  const latestBackup = allBackups.length > 0 ? 
+    new Date(allBackups[0].created).toLocaleDateString('ja-JP') : '未作成';
+  document.getElementById('latestBackup').textContent = latestBackup;
+  
+  // バックアップ総数
+  document.getElementById('totalBackups').textContent = allBackups.length;
+  
+  // 自動バックアップ状態（仮実装）
+  document.getElementById('autoBackupStatus').textContent = '有効';
+  
+  // 使用容量
+  const totalSize = allBackups.reduce((sum, backup) => sum + (backup.size || 0), 0);
+  const sizeText = totalSize > 1024 * 1024 ? 
+    (totalSize / (1024 * 1024)).toFixed(1) + ' MB' : 
+    (totalSize / 1024).toFixed(1) + ' KB';
+  document.getElementById('backupSize').textContent = sizeText;
+}
+
+// バックアップテーブル表示
+function renderBackupTable() {
+  const tbody = document.getElementById('backupList');
+  
+  if (allBackups.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">バックアップファイルがありません</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = allBackups.map(backup => {
+    const created = new Date(backup.created);
+    const sizeText = backup.size > 1024 * 1024 ? 
+      (backup.size / (1024 * 1024)).toFixed(1) + ' MB' : 
+      (backup.size / 1024).toFixed(1) + ' KB';
+    
+    const fileType = backup.name.endsWith('.json') ? 'JSON' : 'スプレッドシート';
+    const typeClass = backup.name.endsWith('.json') ? 'text-info' : 'text-primary';
+    
+    return `
+      <tr>
+        <td>${created.toLocaleString('ja-JP')}</td>
+        <td>${escapeHtml(backup.name)}</td>
+        <td>${sizeText}</td>
+        <td><span class="${typeClass}">${fileType}</span></td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary me-1" onclick="downloadBackup('${backup.id}', '${escapeHtml(backup.name)}')">
+            <i class="bi bi-download"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-warning me-1" onclick="confirmRestore('${backup.id}', '${escapeHtml(backup.name)}')" 
+                  ${fileType === 'JSON' ? 'disabled title="JSON形式は復元できません"' : ''}>
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteBackup('${backup.id}', '${escapeHtml(backup.name)}')">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// 手動バックアップ作成
+async function createManualBackup() {
+  const button = event.target;
+  const originalText = button.innerHTML;
+  
+  try {
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> 作成中...';
+    
+    const result = await apiRequest('manualBackup', 'POST', {
+      action: 'manualBackup'
+    });
+    
+    if (result.success) {
+      showSuccess('手動バックアップが作成されました');
+      await refreshBackupList();
+    } else {
+      throw new Error(result.message || 'バックアップの作成に失敗しました');
+    }
+    
+  } catch (error) {
+    showError('バックアップの作成に失敗しました: ' + error.message);
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// 自動バックアップ設定
+async function setupAutoBackup() {
+  const button = event.target;
+  const originalText = button.innerHTML;
+  
+  try {
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> 設定中...';
+    
+    const result = await apiRequest('setupBackupTrigger', 'POST', {
+      action: 'setupBackupTrigger'
+    });
+    
+    if (result.success) {
+      showSuccess('自動バックアップが設定されました（毎日午前2時に実行）');
+      document.getElementById('autoBackupStatus').textContent = '有効';
+    } else {
+      throw new Error(result.message || '自動バックアップの設定に失敗しました');
+    }
+    
+  } catch (error) {
+    showError('自動バックアップの設定に失敗しました: ' + error.message);
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// バックアップダウンロード
+function downloadBackup(backupId, fileName) {
+  // Google DriveのダウンロードURL
+  const downloadUrl = `https://drive.google.com/uc?id=${backupId}&export=download`;
+  
+  // 新しいタブでダウンロード
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = fileName;
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showSuccess(`${fileName} のダウンロードを開始しました`);
+}
+
+// 復元確認
+function confirmRestore(backupId, fileName) {
+  if (confirm(`${fileName} からデータを復元しますか？\n\n⚠️ 現在のデータは上書きされます。この操作は元に戻せません。`)) {
+    restoreFromBackup(backupId, fileName);
+  }
+}
+
+// バックアップから復元
+async function restoreFromBackup(backupId, fileName) {
+  try {
+    const result = await apiRequest('restoreFromBackup', 'POST', {
+      action: 'restoreFromBackup',
+      backupFileId: backupId
+    });
+    
+    if (result.success) {
+      showSuccess(`${fileName} からの復元が完了しました`);
+      // データ再読み込み
+      if (currentSection === 'reports') {
+        loadReports();
+      }
+    } else {
+      throw new Error(result.message || '復元に失敗しました');
+    }
+    
+  } catch (error) {
+    showError(`復元に失敗しました: ${error.message}`);
+  }
+}
+
+// バックアップ削除確認
+function confirmDeleteBackup(backupId, fileName) {
+  if (confirm(`${fileName} を削除しますか？\n\nこの操作は元に戻せません。`)) {
+    deleteBackup(backupId, fileName);
+  }
+}
+
+// バックアップ削除
+async function deleteBackup(backupId, fileName) {
+  try {
+    // Google Driveファイル削除のAPIが必要（GAS側で実装）
+    const result = await apiRequest('deleteBackup', 'POST', {
+      action: 'deleteBackup',
+      backupFileId: backupId
+    });
+    
+    if (result.success) {
+      showSuccess(`${fileName} を削除しました`);
+      await refreshBackupList();
+    } else {
+      throw new Error(result.message || '削除に失敗しました');
+    }
+    
+  } catch (error) {
+    showError(`削除に失敗しました: ${error.message}`);
+  }
+}
+
+// バックアップローディング表示
+function showBackupLoading(show) {
+  const loading = document.getElementById('backupLoading');
+  const table = document.getElementById('backupTable');
+  const error = document.getElementById('backupError');
+  
+  if (show) {
+    loading.style.display = 'block';
+    table.style.display = 'none';
+    error.style.display = 'none';
+  } else {
+    loading.style.display = 'none';
+  }
+}
+
+// バックアップエラー表示
+function showBackupError(message) {
+  const loading = document.getElementById('backupLoading');
+  const table = document.getElementById('backupTable');
+  const error = document.getElementById('backupError');
+  
+  loading.style.display = 'none';
+  table.style.display = 'none';
+  error.textContent = message;
+  error.style.display = 'block';
+}
+
+// グローバル関数として設定
+window.loadBackup = loadBackup;
+window.refreshBackupList = refreshBackupList;
+window.createManualBackup = createManualBackup;
+window.setupAutoBackup = setupAutoBackup;
+window.downloadBackup = downloadBackup;
+window.confirmRestore = confirmRestore;
+window.confirmDeleteBackup = confirmDeleteBackup;

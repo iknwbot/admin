@@ -55,6 +55,9 @@
             <a href="#" class="nav-link" onclick="showSection('logs', this)">
               <i class="bi bi-list-ul"></i> ログ
             </a>
+            <a href="#" class="nav-link" onclick="showSection('backup', this)">
+              <i class="bi bi-shield-check"></i> バックアップ
+            </a>
             <a href="#" class="nav-link" onclick="logout()">
               <i class="bi bi-box-arrow-right"></i> ログアウト
             </a>
@@ -476,6 +479,101 @@
                   </tr>
                 </thead>
                 <tbody id="logsList">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- バックアップ管理 -->
+          <div id="backup" class="section" style="display:none;">
+            <h2>バックアップ管理</h2>
+            
+            <!-- バックアップ統計 -->
+            <div class="row mt-3 mb-4">
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">最新バックアップ</h6>
+                    <h5 class="text-primary" id="latestBackup">-</h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">バックアップ総数</h6>
+                    <h5 class="text-info" id="totalBackups">-</h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">自動バックアップ</h6>
+                    <h5 class="text-success" id="autoBackupStatus">-</h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">使用容量</h6>
+                    <h5 class="text-warning" id="backupSize">-</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- バックアップ操作 -->
+            <div class="row mb-4">
+              <div class="col-md-12">
+                <div class="card">
+                  <div class="card-header">
+                    <h6 class="mb-0">バックアップ操作</h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="row">
+                      <div class="col-md-4">
+                        <button type="button" class="btn btn-primary w-100" onclick="createManualBackup()">
+                          <i class="bi bi-download"></i> 手動バックアップ作成
+                        </button>
+                      </div>
+                      <div class="col-md-4">
+                        <button type="button" class="btn btn-success w-100" onclick="setupAutoBackup()">
+                          <i class="bi bi-clock"></i> 自動バックアップ設定
+                        </button>
+                      </div>
+                      <div class="col-md-4">
+                        <button type="button" class="btn btn-info w-100" onclick="refreshBackupList()">
+                          <i class="bi bi-arrow-clockwise"></i> 一覧更新
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- バックアップ一覧 -->
+            <div class="table-container mt-4">
+              <div class="loading" id="backupLoading">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>バックアップ一覧を読み込んでいます...</p>
+              </div>
+              <div class="error-message" id="backupError"></div>
+              <table class="table" id="backupTable" style="display:none;">
+                <thead>
+                  <tr>
+                    <th style="width: 200px;">作成日時</th>
+                    <th>ファイル名</th>
+                    <th style="width: 100px;">サイズ</th>
+                    <th style="width: 100px;">種類</th>
+                    <th style="width: 120px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="backupList">
                 </tbody>
               </table>
             </div>
