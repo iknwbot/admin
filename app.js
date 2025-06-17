@@ -620,6 +620,30 @@ function getStatusClass(status) {
   }
 }
 
+// ステータスアイコン取得
+function getStatusIcon(status) {
+  switch(status) {
+    case '投稿まち': return '⚠️';
+    case '金額確定まち': return 'ℹ️';
+    case '振込OK': return '✅';
+    case '振込NG': return '❌';
+    case '完了': return '🏁';
+    default: return '⚠️';
+  }
+}
+
+// ステータスバッジクラス取得（モーダル用）
+function getStatusBadgeClass(status) {
+  switch(status) {
+    case '投稿まち': return 'bg-warning text-dark';
+    case '金額確定まち': return 'bg-info text-white';
+    case '振込OK': return 'bg-success text-white';
+    case '振込NG': return 'bg-danger text-white';
+    case '完了': return 'bg-secondary text-white';
+    default: return 'bg-warning text-dark';
+  }
+}
+
 // グローバル変数
 let pendingStatusChange = null;
 
@@ -792,9 +816,10 @@ function showStatusConfirmModal(report, oldStatus, newStatus, selectElement, rep
     </div>
     <div class="text-center">
       <p class="mb-3">
-        ステータスを 
-        <span class="badge bg-secondary">${oldStatus}</span> から 
-        <span class="badge bg-primary">${newStatus}</span> へ変更します
+        ステータスを<br>
+        <span class="badge ${getStatusBadgeClass(oldStatus)}">${getStatusIcon(oldStatus)} ${oldStatus}</span> から 
+        <span class="badge ${getStatusBadgeClass(newStatus)}">${getStatusIcon(newStatus)} ${newStatus}</span><br>
+        へ変更します
       </p>
       <p class="mb-0 text-muted">よろしいですか？</p>
     </div>
