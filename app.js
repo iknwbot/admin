@@ -1018,9 +1018,16 @@ function applyTransferFilters() {
     
     // ステータスフィルター
     if (statusFilter) {
-      filteredReports = filteredReports.filter(report => 
-        report.processingFlag === statusFilter
-      );
+      if (statusFilter === '要確認') {
+        // 要確認の場合：振込OKのレポートがない拠点
+        filteredReports = filteredReports.filter(report => 
+          report.processingFlag !== '振込OK' && report.processingFlag !== '完了'
+        );
+      } else {
+        filteredReports = filteredReports.filter(report => 
+          report.processingFlag === statusFilter
+        );
+      }
     }
     
     return {
@@ -1034,8 +1041,16 @@ function applyTransferFilters() {
     filteredData = filteredData.filter(siteData => siteData.name === siteFilter);
   }
   
-  // 空の拠点を除外（レポートがない場合）
-  filteredData = filteredData.filter(siteData => siteData.reports.length > 0);
+  // 要確認フィルターの場合は振込OKのレポートがない拠点も表示
+  if (statusFilter === '要確認') {
+    filteredData = filteredData.filter(siteData => {
+      const hasOkReports = siteData.reports.some(report => report.processingFlag === '振込OK');
+      return !hasOkReports; // 振込OKのレポートがない拠点のみ
+    });
+  } else {
+    // 空の拠点を除外（レポートがない場合）
+    filteredData = filteredData.filter(siteData => siteData.reports.length > 0);
+  }
   
   // 統計を更新
   updateTransferStatistics(filteredData);
@@ -1064,9 +1079,14 @@ function updateTransferStatistics(filteredData) {
     return total + siteData.reports
       .filter(report => report.processingFlag === '振込OK')
       .reduce((sum, report) => {
-        // 金額の安全な変換
-        const amount = parseFloat(String(report.amount || '0').replace(/[^0-9.-]/g, ''));
-        return sum + (isNaN(amount) ? 0 : amount);
+        // 金額を確実に数値として取得
+        let amount = 0;
+        if (report.amount !== undefined && report.amount !== null) {
+          const amountStr = String(report.amount).replace(/[^0-9.-]/g, '');
+          amount = parseFloat(amountStr);
+          if (isNaN(amount)) amount = 0;
+        }
+        return sum + amount;
       }, 0);
   }, 0);
   
@@ -1089,10 +1109,17 @@ function renderTransferTable(filteredData) {
   container.innerHTML = filteredData.map((siteData, index) => {
     const okReports = siteData.reports.filter(report => report.processingFlag === '振込OK');
     const totalAmount = okReports.reduce((sum, report) => {
-      const amount = parseFloat(String(report.amount || '0').replace(/[^0-9.-]/g, ''));
-      return sum + (isNaN(amount) ? 0 : amount);
+      // 金額を確実に数値として取得
+      let amount = 0;
+      if (report.amount !== undefined && report.amount !== null) {
+        const amountStr = String(report.amount).replace(/[^0-9.-]/g, '');
+        amount = parseFloat(amountStr);
+        if (isNaN(amount)) amount = 0;
+      }
+      return sum + amount;
     }, 0);
     const hasTransferData = okReports.length > 0;
+    const activityCount = okReports.length;
     
     return `
       <div class="card mb-3">
@@ -1133,21 +1160,26 @@ function renderTransferTable(filteredData) {
           
           <!-- 合計と振込情報 -->
           <div class="row align-items-center">
-            <div class="col-md-4">
-              <strong>合計振込金額: </strong>
-              <span class="h5 text-primary">${isNaN(totalAmount) || totalAmount === 0 ? '0円' : Math.floor(totalAmount).toLocaleString() + '円'}</span>
-            </div>
-            <div class="col-md-5">
-              <strong>振込先口座: </strong>
-              <span class="text-muted">${escapeHtml(siteData.account)}</span>
-            </div>
-            <div class="col-md-3 text-end">
-              ${hasTransferData ? 
-                `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${isNaN(totalAmount) ? 0 : totalAmount})">
-                  <i class="bi bi-bank"></i> 振込完了
-                </button>` :
-                `<span class="text-muted">振込対象なし</span>`
-              }
+            <div class="col-12 text-end">
+              <div class="mb-2">
+                <strong>合計振込金額: </strong>
+                <span class="h5 text-primary">${Math.floor(totalAmount).toLocaleString()}円</span>
+                <span class="ms-3"><strong>活動件数: </strong><span class="h5 text-info">${activityCount}件</span></span>
+              </div>
+              <div class="mb-2">
+                <strong>振込先口座: </strong>
+                <span class="text-muted">${escapeHtml(siteData.account)}</span>
+              </div>
+              <div>
+                ${hasTransferData ? 
+                  `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${totalAmount}, ${activityCount})">
+                    <i class="bi bi-bank"></i> 振込完了
+                  </button>` :
+                  `<button class="btn btn-danger" onclick="showCheckRequired('${escapeHtml(siteData.name)}')">
+                    <i class="bi bi-exclamation-triangle"></i> 要確認
+                  </button>`
+                }
+              </div>
             </div>
           </div>
         </div>
@@ -1169,7 +1201,7 @@ window.applyTransferFilters = applyTransferFilters;
 window.clearTransferFilters = clearTransferFilters;
 
 // 振込確認モーダル表示
-function showTransferConfirm(siteName, account, amount) {
+function showTransferConfirm(siteName, account, amount, activityCount) {
   const modalBody = document.getElementById('transferConfirmModalBody');
   
   modalBody.innerHTML = `
@@ -1181,13 +1213,14 @@ function showTransferConfirm(siteName, account, amount) {
           <i class="bi bi-bank"></i> ${escapeHtml(account)}
         </div>
         <p class="mb-2">振込金額: <strong class="text-success">${Math.floor(amount).toLocaleString()}円</strong></p>
+        <p class="mb-2">活動件数: <strong class="text-info">${activityCount}件</strong></p>
       </div>
       <p class="mb-0 text-muted">振込完了でよろしいですか？</p>
     </div>
   `;
   
   // グローバル変数に情報を保存
-  pendingTransferData = { siteName, account, amount };
+  pendingTransferData = { siteName, account, amount, activityCount };
   
   // モーダル表示
   const modal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
@@ -1259,10 +1292,16 @@ function cancelTransfer() {
   pendingTransferData = null;
 }
 
+// 要確認メッセージ表示
+function showCheckRequired(siteName) {
+  showError(`${siteName} は振込OKのレポートがありません。活動報告ページで確認してください。`);
+}
+
 // グローバル関数として設定
 window.showTransferConfirm = showTransferConfirm;
 window.confirmTransfer = confirmTransfer;
 window.cancelTransfer = cancelTransfer;
+window.showCheckRequired = showCheckRequired;
 
 // ユーティリティ関数
 function escapeHtml(text) {
