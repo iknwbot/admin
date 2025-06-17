@@ -1388,27 +1388,27 @@ function applyLogSort() {
 
 // ユーザーの拠点更新
 async function updateUserSite(userId, newSiteName) {
-  try {
-    const result = await apiRequest('updateUserSite', 'POST', {
-      action: 'updateUserSite',
-      userId: userId,
-      siteName: newSiteName
-    });
-    
-    if (result.success) {
-      // ローカルデータを更新
-      const user = allUsers.find(u => u.userId === userId || u['LINE ID'] === userId);
-      if (user) {
-        user.siteName = newSiteName;
-        user['拠点名'] = newSiteName;
-        applyUserSort(); // 表示を更新
-      }
-      showSuccess('ユーザーの拠点を更新しました');
-    } else {
-      throw new Error(result.error || '更新に失敗しました');
+  console.log('ユーザー拠点更新開始:', { userId, newSiteName });
+  
+  const result = await apiRequest('updateUser', 'POST', {
+    action: 'updateUser',
+    userId: userId,
+    siteName: newSiteName
+  });
+  
+  console.log('GAS更新結果:', result);
+  
+  if (result.success) {
+    // ローカルデータを更新
+    const user = allUsers.find(u => u.userId === userId || u['LINE ID'] === userId);
+    if (user) {
+      user.siteName = newSiteName;
+      user['拠点名'] = newSiteName;
     }
-  } catch (error) {
-    showError('更新に失敗しました: ' + error.message);
+    return true;
+  } else {
+    console.error('GAS更新エラー:', result.error);
+    throw new Error(result.error || 'GASバックエンドエラー: ユーザー拠点更新API未対応');
   }
 }
 
@@ -1457,9 +1457,13 @@ async function saveUserEdit(button, userIndex) {
     editBtn.classList.remove('d-none');
     saveBtn.classList.add('d-none');
     
-    showSuccess('ユーザー拠点を更新しました');
+    // テーブル表示を更新
+    await applyUserSort();
+    
+    showSuccess('ユーザー拠点をGoogle Sheetsに保存しました');
   } catch (error) {
-    showError('保存に失敗しました: ' + error.message);
+    console.error('ユーザー拠点更新エラー:', error);
+    showError('拠点変更に失敗しました: ' + error.message);
   }
 }
 
