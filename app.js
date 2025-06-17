@@ -567,9 +567,72 @@ async function loadLogs() {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
+      // 古い形式のログを新しい形式に変換
+      allLogs = allLogs.map(log => {
+        // 新形式の場合はそのまま
+        if (log['タイムスタンプ'] || log.timestamp) {
+          return log;
+        }
+        
+        // 古い形式の場合は変換
+        const keys = Object.keys(log);
+        if (keys.length >= 3) {
+          // 最初のキーがタイムスタンプ、2番目が種類/ログ内容、3番目が詳細の可能性
+          const timestampKey = keys[0];
+          const typeOrMessageKey = keys[1];
+          const detailsKey = keys[2];
+          
+          // タイムスタンプを解析
+          let timestamp = log[timestampKey];
+          if (timestampKey.includes('GMT')) {
+            timestamp = new Date(timestampKey);
+          }
+          
+          // 種類とカテゴリを推測
+          let type = 'INFO';
+          let category = '管理画面';
+          let details = '';
+          
+          // typeOrMessageKeyから種類を推測
+          if (typeOrMessageKey.includes('✅') || log[typeOrMessageKey] === 'SUCCESS') {
+            type = 'SUCCESS';
+          } else if (typeOrMessageKey.includes('❌') || log[typeOrMessageKey] === 'ERROR') {
+            type = 'ERROR';
+          } else if (typeOrMessageKey.includes('⚠') || log[typeOrMessageKey] === 'WARNING') {
+            type = 'WARNING';
+          }
+          
+          // カテゴリを推測
+          if (typeOrMessageKey.includes('活動報告') || log[detailsKey].includes('活動報告')) {
+            category = '活動報告';
+          } else if (typeOrMessageKey.includes('寄付') || log[detailsKey].includes('寄付')) {
+            category = '寄付';
+          } else if (typeOrMessageKey.includes('ユーザ') || log[detailsKey].includes('ユーザ')) {
+            category = 'ユーザ';
+          } else if (typeOrMessageKey.includes('振込') || log[detailsKey].includes('振込')) {
+            category = '振込確認';
+          } else if (log[detailsKey].includes('ステータス更新')) {
+            category = '管理画面';
+          }
+          
+          // 詳細を設定
+          details = log[detailsKey] || typeOrMessageKey;
+          
+          return {
+            'タイムスタンプ': timestamp,
+            '種類': type,
+            'カテゴリ': category,
+            '詳細': details
+          };
+        }
+        
+        return log;
+      });
+      
+      // 最近30日のログのみを取得
       allLogs = allLogs.filter(log => {
         const logDate = new Date(log['タイムスタンプ'] || log.timestamp);
-        return logDate >= thirtyDaysAgo;
+        return !isNaN(logDate) && logDate >= thirtyDaysAgo;
       });
       
       console.log('Filtered logs:', allLogs);
