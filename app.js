@@ -374,12 +374,13 @@ function filterReports() {
         <td>
           <select class="form-select form-select-sm status-select" 
                   onchange="changeReportStatus(this, ${originalIndex})"
-                  data-original-status="${report.processingFlag || '投稿まち'}">
-            <option value="投稿まち" ${(report.processingFlag || '投稿まち') === '投稿まち' ? 'selected' : ''}>投稿まち</option>
-            <option value="金額確定まち" ${report.processingFlag === '金額確定まち' ? 'selected' : ''}>金額確定まち</option>
-            <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>振込OK</option>
-            <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>振込NG</option>
-            <option value="完了" ${report.processingFlag === '完了' ? 'selected' : ''}>完了</option>
+                  data-original-status="${report.processingFlag || '投稿まち'}"
+                  data-current-status="${report.processingFlag || '投稿まち'}">
+            <option value="投稿まち" ${(report.processingFlag || '投稿まち') === '投稿まち' ? 'selected' : ''}>⚠️ 投稿まち</option>
+            <option value="金額確定まち" ${report.processingFlag === '金額確定まち' ? 'selected' : ''}>ℹ️ 金額確定まち</option>
+            <option value="振込OK" ${report.processingFlag === '振込OK' ? 'selected' : ''}>✅ 振込OK</option>
+            <option value="振込NG" ${report.processingFlag === '振込NG' ? 'selected' : ''}>❌ 振込NG</option>
+            <option value="完了" ${report.processingFlag === '完了' ? 'selected' : ''}>🏁 完了</option>
           </select>
         </td>
         <td>
@@ -776,6 +777,7 @@ async function changeReportStatus(selectElement, reportIndex) {
       // ローカルデータを更新
       allReports[reportIndex].processingFlag = newStatus;
       selectElement.setAttribute('data-original-status', newStatus);
+      selectElement.setAttribute('data-current-status', newStatus);
       
       // 統計を更新
       updateStatistics();
