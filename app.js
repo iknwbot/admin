@@ -592,11 +592,14 @@ async function loadLogs() {
           const firstKey = keys[0];
           const firstValue = log[firstKey];
           
-          if (firstKey.includes('GMT') || firstKey.includes('2025')) {
-            // キー自体がタイムスタンプの場合
+          // 値が正しいタイムスタンプ（ISO形式）の場合を優先
+          if (firstValue && firstValue.includes('2025-06-17T')) {
+            timestamp = new Date(firstValue);
+          } else if (firstKey.includes('GMT') || firstKey.includes('2025')) {
+            // キー自体がタイムスタンプの場合（フォールバック）
             timestamp = new Date(firstKey);
           } else {
-            // 値がタイムスタンプの場合
+            // その他の場合
             timestamp = new Date(firstValue);
           }
           
