@@ -37,6 +37,9 @@
             <a href="#" class="nav-link active" onclick="showSection('reports', this)">
               <i class="bi bi-file-text"></i> 活動報告
             </a>
+            <a href="#" class="nav-link" onclick="showSection('transfer-confirm', this)">
+              <i class="bi bi-bank"></i> 振込確認
+            </a>
             <a href="#" class="nav-link" onclick="showSection('food-donations', this)">
               <i class="bi bi-gift"></i> 寄付報告（食品）
             </a>
@@ -180,6 +183,98 @@
                 <tbody id="reportsList">
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- 振込確認 -->
+          <div id="transfer-confirm" class="section" style="display:none;">
+            <h2>振込確認</h2>
+            
+            <!-- ダッシュボード統計 -->
+            <div class="row mt-3 mb-4">
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">総団体数</h6>
+                    <h4 class="text-primary" id="totalOrganizations">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">振込件数</h6>
+                    <h4 class="text-success" id="transferCount">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">活動なし団体</h6>
+                    <h4 class="text-warning" id="noActivityCount">-</h4>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card stat-card-sm">
+                  <div class="card-body">
+                    <h6 class="card-title">総振込金額</h6>
+                    <h4 class="text-info" id="totalTransferAmount">-</h4>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- フィルター -->
+            <div class="row mb-3">
+              <div class="col-md-3">
+                <label for="transferMonthFilter" class="form-label">対象月</label>
+                <select id="transferMonthFilter" class="form-select">
+                  <!-- 動的に生成 -->
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="transferStatusFilter" class="form-label">ステータス</label>
+                <select id="transferStatusFilter" class="form-select">
+                  <option value="">全て</option>
+                  <option value="振込OK">振込OK</option>
+                  <option value="完了">完了</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label for="transferSiteFilter" class="form-label">拠点名</label>
+                <select id="transferSiteFilter" class="form-select">
+                  <option value="">全て</option>
+                  <!-- 動的に生成 -->
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                  <button type="button" class="btn btn-primary" onclick="applyTransferFilters()">
+                    <i class="bi bi-search"></i> 検索
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearTransferFilters()">
+                    <i class="bi bi-arrow-clockwise"></i> リセット
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <div class="loading">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>データを読み込んでいます...</p>
+              </div>
+              <div class="error-message"></div>
+              <div id="transferTable" style="display:none;">
+                <div id="transferList">
+                  <!-- 動的に生成される振込確認テーブル -->
+                </div>
+              </div>
             </div>
           </div>
 
@@ -491,6 +586,25 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" onclick="cancelStatusChange()">いいえ</button>
           <button type="button" class="btn btn-primary btn-sm" onclick="confirmStatusChange()">はい</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 振込確認モーダル -->
+  <div class="modal fade" id="transferConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title">振込完了確認</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="cancelTransfer()"></button>
+        </div>
+        <div class="modal-body" id="transferConfirmModalBody">
+          <!-- 確認内容が動的に挿入される -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" onclick="cancelTransfer()">いいえ</button>
+          <button type="button" class="btn btn-success btn-sm" onclick="confirmTransfer()">はい</button>
         </div>
       </div>
     </div>

@@ -215,6 +215,9 @@ function showSection(sectionName, targetElement = null) {
     case 'logs':
       loadLogs();
       break;
+    case 'transfer-confirm':
+      loadTransferConfirm();
+      break;
   }
 }
 
@@ -889,6 +892,355 @@ function cancelStatusChange() {
   
   window.pendingStatusChangeData = null;
 }
+
+// 振込確認関連の変数とデータ
+let allTransferData = [];
+let pendingTransferData = null;
+
+// 振込確認データ読み込み
+async function loadTransferConfirm() {
+  const container = document.querySelector('#transfer-confirm .table-container');
+  const loading = container.querySelector('.loading');
+  const errorMsg = container.querySelector('.error-message');
+  const table = document.getElementById('transferTable');
+  
+  loading.style.display = 'block';
+  errorMsg.style.display = 'none';
+  table.style.display = 'none';
+  
+  try {
+    // 活動報告データと拠点データを取得
+    const [reportsResult, sitesResult] = await Promise.all([
+      apiRequest('getAdminReports'),
+      apiRequest('getSite?userId=admin')
+    ]);
+    
+    if ((reportsResult.success || reportsResult.data) && (sitesResult.success && sitesResult.data)) {
+      const reports = reportsResult.data || reportsResult.reports || [];
+      const sites = sitesResult.data || [];
+      
+      // 振込確認用のデータを生成
+      allTransferData = generateTransferData(reports, sites);
+      
+      // フィルター初期化
+      initializeTransferFilters();
+      
+      // 表示を更新
+      applyTransferFilters();
+      
+      loading.style.display = 'none';
+      table.style.display = 'block';
+    } else {
+      throw new Error('データ取得エラー');
+    }
+  } catch (error) {
+    loading.style.display = 'none';
+    errorMsg.textContent = 'エラー: ' + error.message;
+    errorMsg.style.display = 'block';
+  }
+}
+
+// 振込確認用データの生成
+function generateTransferData(reports, sites) {
+  const siteMap = new Map();
+  
+  // 拠点情報をマップに格納
+  sites.forEach(site => {
+    const siteName = site['拠点名'] || site.siteName || site.name || '';
+    siteMap.set(siteName, {
+      name: siteName,
+      account: site['振込口座'] || site.transferDestination || site.account || '口座情報なし',
+      reports: []
+    });
+  });
+  
+  // 活動報告を拠点別に分類
+  reports.forEach(report => {
+    const siteName = report.siteName;
+    if (siteMap.has(siteName)) {
+      siteMap.get(siteName).reports.push(report);
+    } else {
+      // 拠点データにない場合は新規作成
+      siteMap.set(siteName, {
+        name: siteName,
+        account: '口座情報なし',
+        reports: [report]
+      });
+    }
+  });
+  
+  return Array.from(siteMap.values());
+}
+
+// 振込フィルター初期化
+function initializeTransferFilters() {
+  initializeMonthFilter('transferMonthFilter', applyTransferFilters);
+  
+  // 拠点フィルター
+  const transferSiteFilter = document.getElementById('transferSiteFilter');
+  if (transferSiteFilter && allTransferData) {
+    // 既存のオプションをクリア（「全て」以外）
+    while (transferSiteFilter.options.length > 1) {
+      transferSiteFilter.remove(1);
+    }
+    
+    // 拠点名を追加
+    const siteNames = allTransferData.map(data => data.name).sort();
+    siteNames.forEach(siteName => {
+      const option = document.createElement('option');
+      option.value = siteName;
+      option.textContent = siteName;
+      transferSiteFilter.appendChild(option);
+    });
+  }
+}
+
+// 振込フィルター適用
+function applyTransferFilters() {
+  const monthFilter = document.getElementById('transferMonthFilter').value;
+  const statusFilter = document.getElementById('transferStatusFilter').value;
+  const siteFilter = document.getElementById('transferSiteFilter').value;
+  
+  let filteredData = allTransferData.map(siteData => {
+    let filteredReports = siteData.reports;
+    
+    // 月フィルター（開催日ベース）
+    if (monthFilter) {
+      filteredReports = filteredReports.filter(report => {
+        const eventDate = new Date(report.eventDate);
+        const eventMonth = eventDate.getFullYear() + '-' + String(eventDate.getMonth() + 1).padStart(2, '0');
+        return eventMonth === monthFilter;
+      });
+    }
+    
+    // ステータスフィルター
+    if (statusFilter) {
+      filteredReports = filteredReports.filter(report => 
+        report.processingFlag === statusFilter
+      );
+    }
+    
+    return {
+      ...siteData,
+      reports: filteredReports
+    };
+  });
+  
+  // 拠点フィルター
+  if (siteFilter) {
+    filteredData = filteredData.filter(siteData => siteData.name === siteFilter);
+  }
+  
+  // 空の拠点を除外（レポートがない場合）
+  filteredData = filteredData.filter(siteData => siteData.reports.length > 0);
+  
+  // 統計を更新
+  updateTransferStatistics(filteredData);
+  
+  // テーブル表示を更新
+  renderTransferTable(filteredData);
+}
+
+// 振込統計更新
+function updateTransferStatistics(filteredData) {
+  const totalOrganizations = filteredData.length;
+  const transferCount = filteredData.filter(siteData => 
+    siteData.reports.some(report => report.processingFlag === '振込OK')
+  ).length;
+  const noActivityCount = allTransferData.length - filteredData.length;
+  const totalAmount = filteredData.reduce((total, siteData) => {
+    return total + siteData.reports
+      .filter(report => report.processingFlag === '振込OK')
+      .reduce((sum, report) => sum + (parseInt(report.amount) || 0), 0);
+  }, 0);
+  
+  document.getElementById('totalOrganizations').textContent = totalOrganizations;
+  document.getElementById('transferCount').textContent = transferCount;
+  document.getElementById('noActivityCount').textContent = noActivityCount;
+  document.getElementById('totalTransferAmount').textContent = 
+    totalAmount.toLocaleString().replace(/\\/g, '') + '円';
+}
+
+// 振込テーブル表示
+function renderTransferTable(filteredData) {
+  const container = document.getElementById('transferList');
+  
+  if (filteredData.length === 0) {
+    container.innerHTML = '<div class="text-center p-4">該当するデータがありません</div>';
+    return;
+  }
+  
+  container.innerHTML = filteredData.map((siteData, index) => {
+    const okReports = siteData.reports.filter(report => report.processingFlag === '振込OK');
+    const totalAmount = okReports.reduce((sum, report) => sum + (parseInt(report.amount) || 0), 0);
+    const hasTransferData = okReports.length > 0;
+    
+    return `
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="mb-0">${escapeHtml(siteData.name)}</h6>
+        </div>
+        <div class="card-body">
+          <!-- 活動報告一覧 -->
+          <div class="table-responsive mb-3">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>開催日</th>
+                  <th>開催タイプ</th>
+                  <th>金額</th>
+                  <th>ステータス</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${siteData.reports.map(report => `
+                  <tr>
+                    <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
+                    <td>${escapeHtml(report.eventType)}</td>
+                    <td>${report.amount ? parseInt(report.amount).toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
+                    <td>
+                      <span class="badge ${getStatusBadgeClass(report.processingFlag || '投稿まち')}">
+                        ${getStatusIcon(report.processingFlag || '投稿まち')} ${report.processingFlag || '投稿まち'}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- 合計と振込情報 -->
+          <div class="row align-items-center">
+            <div class="col-md-4">
+              <strong>合計振込金額: </strong>
+              <span class="h5 text-primary">${totalAmount.toLocaleString().replace(/\\/g, '')}円</span>
+            </div>
+            <div class="col-md-5">
+              <strong>振込先口座: </strong>
+              <span class="text-muted">${escapeHtml(siteData.account)}</span>
+            </div>
+            <div class="col-md-3 text-end">
+              ${hasTransferData ? 
+                `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${totalAmount})">
+                  <i class="bi bi-bank"></i> 振込完了
+                </button>` :
+                `<span class="text-muted">振込対象なし</span>`
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// 振込フィルタークリア
+function clearTransferFilters() {
+  document.getElementById('transferMonthFilter').value = '';
+  document.getElementById('transferStatusFilter').value = '';
+  document.getElementById('transferSiteFilter').value = '';
+  applyTransferFilters();
+}
+
+// グローバル関数として設定
+window.applyTransferFilters = applyTransferFilters;
+window.clearTransferFilters = clearTransferFilters;
+
+// 振込確認モーダル表示
+function showTransferConfirm(siteName, account, amount) {
+  const modalBody = document.getElementById('transferConfirmModalBody');
+  
+  modalBody.innerHTML = `
+    <div class="text-center">
+      <div class="mb-3">
+        <h6 class="text-primary">${escapeHtml(siteName)}</h6>
+        <p class="mb-2">への振り込み先</p>
+        <div class="alert alert-info mb-3">
+          <i class="bi bi-bank"></i> ${escapeHtml(account)}
+        </div>
+        <p class="mb-2">振込金額: <strong class="text-success">${amount.toLocaleString().replace(/\\/g, '')}円</strong></p>
+      </div>
+      <p class="mb-0 text-muted">振込完了でよろしいですか？</p>
+    </div>
+  `;
+  
+  // グローバル変数に情報を保存
+  pendingTransferData = { siteName, account, amount };
+  
+  // モーダル表示
+  const modal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
+  modal.show();
+}
+
+// 振込確定処理
+async function confirmTransfer() {
+  if (!pendingTransferData) return;
+  
+  const { siteName } = pendingTransferData;
+  
+  try {
+    // 該当拠点の「振込OK」ステータスのレポートを「完了」に更新
+    const siteData = allTransferData.find(data => data.name === siteName);
+    if (!siteData) {
+      throw new Error('拠点データが見つかりません');
+    }
+    
+    const okReports = siteData.reports.filter(report => report.processingFlag === '振込OK');
+    
+    // 複数のレポートを一括更新
+    const updatePromises = okReports.map(report => 
+      apiRequest('updateReportStatus', 'POST', {
+        action: 'updateReportStatus',
+        timestamp: report.timestamp,
+        siteName: report.siteName,
+        status: '完了'
+      })
+    );
+    
+    await Promise.all(updatePromises);
+    
+    // ローカルデータを更新
+    okReports.forEach(report => {
+      report.processingFlag = '完了';
+      
+      // allReportsも更新（存在する場合）
+      if (window.allReports) {
+        const originalReport = allReports.find(r => 
+          r.timestamp === report.timestamp && 
+          r.siteName === report.siteName && 
+          r.userId === report.userId
+        );
+        if (originalReport) {
+          originalReport.processingFlag = '完了';
+        }
+      }
+    });
+    
+    // モーダルを閉じる
+    const modal = bootstrap.Modal.getInstance(document.getElementById('transferConfirmModal'));
+    if (modal) modal.hide();
+    
+    // 表示を更新
+    applyTransferFilters();
+    
+    showSuccess(`${siteName}の振込処理が完了しました。${okReports.length}件のレポートを「完了」に更新しました。`);
+    
+  } catch (error) {
+    showError('振込処理に失敗しました: ' + error.message);
+  } finally {
+    pendingTransferData = null;
+  }
+}
+
+// 振込キャンセル処理
+function cancelTransfer() {
+  pendingTransferData = null;
+}
+
+// グローバル関数として設定
+window.showTransferConfirm = showTransferConfirm;
+window.confirmTransfer = confirmTransfer;
+window.cancelTransfer = cancelTransfer;
 
 // ユーティリティ関数
 function escapeHtml(text) {
