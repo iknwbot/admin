@@ -166,6 +166,34 @@ body {
   border-top: 1px solid #e9ecef;
 }
 
+/* 拠点管理テーブルの幅調整 */
+#sitesList .website-display,
+#sitesList .website-input {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sitesList .account-display,
+#sitesList .account-input {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 拠点管理テーブルの列幅固定 */
+#sites .table th:nth-child(1) { width: 150px; }
+#sites .table th:nth-child(2) { width: 200px; }
+#sites .table th:nth-child(3) { width: 180px; }
+#sites .table th:nth-child(4) { width: 100px; }
+
+#sites .table td:nth-child(1) { width: 150px; }
+#sites .table td:nth-child(2) { width: 200px; }
+#sites .table td:nth-child(3) { width: 180px; }
+#sites .table td:nth-child(4) { width: 100px; }
+
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
   .sidebar {
@@ -185,6 +213,16 @@ body {
   .table-container {
     overflow-x: auto;
   }
+  
+  /* モバイルでの拠点管理テーブル調整 */
+  #sites .table th:nth-child(1),
+  #sites .table td:nth-child(1) { width: 120px; }
+  #sites .table th:nth-child(2),
+  #sites .table td:nth-child(2) { width: 150px; }
+  #sites .table th:nth-child(3),
+  #sites .table td:nth-child(3) { width: 130px; }
+  #sites .table th:nth-child(4),
+  #sites .table td:nth-child(4) { width: 80px; }
 }
 
 /* ボタンのカスタマイズ */
