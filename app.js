@@ -1046,22 +1046,35 @@ function applyTransferFilters() {
 
 // 振込統計更新
 function updateTransferStatistics(filteredData) {
-  const totalOrganizations = filteredData.length;
+  // 総団体数は全拠点の数（フィルタに関係なく）
+  const totalOrganizations = allTransferData.length;
+  
+  // 振込あり団体数（振込OKのレポートがある拠点数）
   const transferCount = filteredData.filter(siteData => 
     siteData.reports.some(report => report.processingFlag === '振込OK')
   ).length;
-  const noActivityCount = allTransferData.length - filteredData.length;
+  
+  // 活動なし団体数
+  const noActivityCount = allTransferData.filter(siteData => 
+    siteData.reports.length === 0
+  ).length;
+  
+  // 総振込金額の計算（NaN対策を追加）
   const totalAmount = filteredData.reduce((total, siteData) => {
     return total + siteData.reports
       .filter(report => report.processingFlag === '振込OK')
-      .reduce((sum, report) => sum + (parseInt(report.amount) || 0), 0);
+      .reduce((sum, report) => {
+        // 金額の安全な変換
+        const amount = parseFloat(String(report.amount || '0').replace(/[^0-9.-]/g, ''));
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0);
   }, 0);
   
   document.getElementById('totalOrganizations').textContent = totalOrganizations;
   document.getElementById('transferCount').textContent = transferCount;
   document.getElementById('noActivityCount').textContent = noActivityCount;
   document.getElementById('totalTransferAmount').textContent = 
-    totalAmount.toLocaleString().replace(/\\/g, '') + '円';
+    isNaN(totalAmount) ? '0円' : Math.floor(totalAmount).toLocaleString() + '円';
 }
 
 // 振込テーブル表示
@@ -1075,7 +1088,10 @@ function renderTransferTable(filteredData) {
   
   container.innerHTML = filteredData.map((siteData, index) => {
     const okReports = siteData.reports.filter(report => report.processingFlag === '振込OK');
-    const totalAmount = okReports.reduce((sum, report) => sum + (parseInt(report.amount) || 0), 0);
+    const totalAmount = okReports.reduce((sum, report) => {
+      const amount = parseFloat(String(report.amount || '0').replace(/[^0-9.-]/g, ''));
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0);
     const hasTransferData = okReports.length > 0;
     
     return `
@@ -1100,7 +1116,10 @@ function renderTransferTable(filteredData) {
                   <tr>
                     <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
                     <td>${escapeHtml(report.eventType)}</td>
-                    <td>${report.amount ? parseInt(report.amount).toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
+                    <td>${(() => {
+                      const amount = parseFloat(String(report.amount || '0').replace(/[^0-9.-]/g, ''));
+                      return isNaN(amount) || amount === 0 ? '-' : Math.floor(amount).toLocaleString() + '円';
+                    })()}</td>
                     <td>
                       <span class="badge ${getStatusBadgeClass(report.processingFlag || '投稿まち')}">
                         ${getStatusIcon(report.processingFlag || '投稿まち')} ${report.processingFlag || '投稿まち'}
@@ -1116,7 +1135,7 @@ function renderTransferTable(filteredData) {
           <div class="row align-items-center">
             <div class="col-md-4">
               <strong>合計振込金額: </strong>
-              <span class="h5 text-primary">${totalAmount.toLocaleString().replace(/\\/g, '')}円</span>
+              <span class="h5 text-primary">${isNaN(totalAmount) || totalAmount === 0 ? '0円' : Math.floor(totalAmount).toLocaleString() + '円'}</span>
             </div>
             <div class="col-md-5">
               <strong>振込先口座: </strong>
@@ -1124,7 +1143,7 @@ function renderTransferTable(filteredData) {
             </div>
             <div class="col-md-3 text-end">
               ${hasTransferData ? 
-                `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${totalAmount})">
+                `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${isNaN(totalAmount) ? 0 : totalAmount})">
                   <i class="bi bi-bank"></i> 振込完了
                 </button>` :
                 `<span class="text-muted">振込対象なし</span>`
@@ -1161,7 +1180,7 @@ function showTransferConfirm(siteName, account, amount) {
         <div class="alert alert-info mb-3">
           <i class="bi bi-bank"></i> ${escapeHtml(account)}
         </div>
-        <p class="mb-2">振込金額: <strong class="text-success">${amount.toLocaleString().replace(/\\/g, '')}円</strong></p>
+        <p class="mb-2">振込金額: <strong class="text-success">${Math.floor(amount).toLocaleString()}円</strong></p>
       </div>
       <p class="mb-0 text-muted">振込完了でよろしいですか？</p>
     </div>
