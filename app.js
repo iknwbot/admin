@@ -458,26 +458,8 @@ async function loadFoodDonations() {
       // 統計を更新
       updateFoodDonationStatistics(allFoodDonations);
       
-      if (allFoodDonations.length > 0) {
-        tbody.innerHTML = allFoodDonations.map((donation, index) => `
-          <tr>
-            <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
-            <td>${escapeHtml(donation.siteName)}</td>
-            <td>${escapeHtml(donation.nickname || donation.userId)}</td>
-            <td>${escapeHtml(donation.donor || '-')}</td>
-            <td>${escapeHtml(donation.itemName || '-')}</td>
-            <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
-            <td>
-              ${donation.instagramUrl && donation.instagramUrl.trim() !== '' ? 
-                `<a href="${donation.instagramUrl}" target="_blank" class="btn btn-sm btn-outline-success instagram-btn">投稿済</a>` :
-                `<button class="btn btn-sm btn-primary instagram-btn" onclick="postToInstagram(${index})">投稿</button>`
-              }
-            </td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">データがありません</td></tr>';
-      }
+      // ソートを適用して表示
+      applyFoodDonationSort();
       
       loading.style.display = 'none';
       table.style.display = 'table';
@@ -515,20 +497,8 @@ async function loadMoneyDonations() {
       // 統計を更新
       updateMoneyDonationStatistics(allMoneyDonations);
       
-      if (allMoneyDonations.length > 0) {
-        tbody.innerHTML = allMoneyDonations.map(donation => `
-          <tr>
-            <td>${new Date(donation.timestamp).toLocaleDateString('ja-JP')}</td>
-            <td>${escapeHtml(donation.siteName)}</td>
-            <td>${escapeHtml(donation.nickname || donation.userId)}</td>
-            <td>${escapeHtml(donation.donor || '-')}</td>
-            <td>${donation.amount ? parseInt(donation.amount).toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
-            <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">データがありません</td></tr>';
-      }
+      // ソートを適用して表示
+      applyMoneyDonationSort();
       
       loading.style.display = 'none';
       table.style.display = 'table';
@@ -558,19 +528,7 @@ async function loadLogs() {
     
     if (result.success || result.data) {
       allLogs = result.data || result.logs || [];
-      
-      const tbody = document.getElementById('logsList');
-      if (allLogs.length > 0) {
-        tbody.innerHTML = allLogs.slice(0, 100).map(log => `
-          <tr>
-            <td>${new Date(log.timestamp).toLocaleString('ja-JP')}</td>
-            <td>${escapeHtml(log.type || log.action)}</td>
-            <td>${escapeHtml(log.details || log.message)}</td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center">データがありません</td></tr>';
-      }
+      applyLogSort();
       
       loading.style.display = 'none';
       table.style.display = 'table';
@@ -591,20 +549,7 @@ async function loadUsers() {
     
     if (result.success || result.data) {
       allUsers = result.data || [];
-      const tbody = document.getElementById('usersList');
-      
-      if (allUsers.length > 0) {
-        tbody.innerHTML = allUsers.map(user => `
-          <tr>
-            <td>${escapeHtml(user.siteName || user['拠点名'] || '')}</td>
-            <td>${escapeHtml(user.nickname || user['管理者名'] || '')}</td>
-            <td>${escapeHtml(user.userId || user['LINE ID'] || '')}</td>
-            <td>${user.registrationDate ? new Date(user.registrationDate).toLocaleDateString('ja-JP') : '-'}</td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center">データがありません</td></tr>';
-      }
+      applyUserSort();
     }
   } catch (error) {
     console.error('Users load error:', error);
@@ -619,33 +564,7 @@ async function loadSites() {
     
     if (result.success && result.data) {
       allSites = result.data || [];
-      const tbody = document.getElementById('sitesList');
-      
-      if (allSites.length > 0) {
-        tbody.innerHTML = allSites.map(site => `
-          <tr>
-            <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site['拠点名'] || site.siteName || site.name)}" 
-                     onchange="updateSite('${escapeHtml(site['拠点名'] || site.siteName || site.name)}', 'name', this.value)" readonly>
-            </td>
-            <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site['web'] || site.webSite || site.website || '')}" 
-                     onchange="updateSite('${escapeHtml(site['拠点名'] || site.siteName || site.name)}', 'webSite', this.value)">
-            </td>
-            <td>
-              <input type="text" class="form-control form-control-sm" value="${escapeHtml(site['振込口座'] || site.transferDestination || site.account || '')}" 
-                     onchange="updateSite('${escapeHtml(site['拠点名'] || site.siteName || site.name)}', 'transferDestination', this.value)">
-            </td>
-            <td>
-              <button class="btn btn-sm btn-primary" onclick="toggleEdit(this)">
-                <i class="bi bi-pencil"></i> 編集
-              </button>
-            </td>
-          </tr>
-        `).join('');
-      } else {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center">データがありません</td></tr>';
-      }
+      applySiteSort();
     }
   } catch (error) {
     console.error('Sites load error:', error);
@@ -653,23 +572,7 @@ async function loadSites() {
   }
 }
 
-// 編集モード切り替え
-function toggleEdit(button) {
-  const row = button.closest('tr');
-  const inputs = row.querySelectorAll('input:not([readonly])');
-  const isEditing = button.textContent.includes('保存');
-  
-  if (isEditing) {
-    // 保存処理
-    button.innerHTML = '<i class="bi bi-pencil"></i> 編集';
-    inputs.forEach(input => input.disabled = true);
-    showSuccess('変更を保存しました');
-  } else {
-    // 編集モード
-    button.innerHTML = '<i class="bi bi-check"></i> 保存';
-    inputs.forEach(input => input.disabled = false);
-  }
-}
+// 古い編集機能（削除済み）
 
 
 // サイト情報更新
@@ -1034,8 +937,75 @@ function updateMoneyDonationStatistics(donations) {
 
 // 食品寄付フィルター
 function filterFoodDonations() {
-  const monthFilter = document.getElementById('foodMonthFilter').value;
+  applyFoodDonationSort();
+}
+
+// 金銭寄付フィルター
+function filterMoneyDonations() {
+  applyMoneyDonationSort();
+}
+
+// Instagram投稿処理
+function postToInstagram(donationIndex) {
+  const donation = allFoodDonations[donationIndex];
+  if (!donation) return;
   
+  const instagramUrl = prompt(`Instagram投稿URLを入力してください:\n\n寄付品名: ${donation.itemName}\n寄付元: ${donation.donor}`);
+  
+  if (instagramUrl && instagramUrl.trim()) {
+    // 実際の処理ではGASにデータを送信
+    donation.instagramUrl = instagramUrl.trim();
+    loadFoodDonations(); // 表示を更新
+    showSuccess('Instagram投稿URLを設定しました');
+  }
+}
+
+// 食品寄付ソート用のグローバル変数
+let foodSortColumn = 'timestamp';
+let foodSortDirection = 'desc';
+
+// 食品寄付ソート関数
+window.sortFoodDonations = function(column) {
+  if (foodSortColumn === column) {
+    foodSortDirection = foodSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    foodSortColumn = column;
+    foodSortDirection = 'asc';
+  }
+  applyFoodDonationSort();
+}
+
+// 食品寄付配列をソート
+function sortFoodDonationsArray(donations) {
+  return donations.sort((a, b) => {
+    let aVal = a[foodSortColumn];
+    let bVal = b[foodSortColumn];
+    
+    // 日付の場合
+    if (foodSortColumn === 'timestamp') {
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
+    }
+    
+    // 文字列の場合
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (foodSortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+}
+
+// 食品寄付ソート適用
+function applyFoodDonationSort() {
+  if (!allFoodDonations || !Array.isArray(allFoodDonations)) return;
+  
+  const monthFilter = document.getElementById('foodMonthFilter').value;
   let filteredDonations = allFoodDonations;
   
   if (monthFilter) {
@@ -1045,6 +1015,9 @@ function filterFoodDonations() {
       return donationMonth === monthFilter;
     });
   }
+  
+  // ソート適用
+  filteredDonations = sortFoodDonationsArray(filteredDonations);
   
   const tbody = document.getElementById('foodDonationsList');
   if (filteredDonations.length > 0) {
@@ -1069,10 +1042,58 @@ function filterFoodDonations() {
   }
 }
 
-// 金銭寄付フィルター
-function filterMoneyDonations() {
-  const monthFilter = document.getElementById('moneyMonthFilter').value;
+// 金銭寄付ソート用のグローバル変数
+let moneySortColumn = 'timestamp';
+let moneySortDirection = 'desc';
+
+// 金銭寄付ソート関数
+window.sortMoneyDonations = function(column) {
+  if (moneySortColumn === column) {
+    moneySortDirection = moneySortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    moneySortColumn = column;
+    moneySortDirection = 'asc';
+  }
+  applyMoneyDonationSort();
+}
+
+// 金銭寄付配列をソート
+function sortMoneyDonationsArray(donations) {
+  return donations.sort((a, b) => {
+    let aVal = a[moneySortColumn];
+    let bVal = b[moneySortColumn];
+    
+    // 日付の場合
+    if (moneySortColumn === 'timestamp') {
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
+    }
+    
+    // 金額の場合
+    if (moneySortColumn === 'amount') {
+      aVal = parseInt(aVal) || 0;
+      bVal = parseInt(bVal) || 0;
+    }
+    
+    // 文字列の場合
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (moneySortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+}
+
+// 金銭寄付ソート適用
+function applyMoneyDonationSort() {
+  if (!allMoneyDonations || !Array.isArray(allMoneyDonations)) return;
   
+  const monthFilter = document.getElementById('moneyMonthFilter').value;
   let filteredDonations = allMoneyDonations;
   
   if (monthFilter) {
@@ -1083,6 +1104,9 @@ function filterMoneyDonations() {
     });
   }
   
+  // ソート適用
+  filteredDonations = sortMoneyDonationsArray(filteredDonations);
+  
   const tbody = document.getElementById('moneyDonationsList');
   if (filteredDonations.length > 0) {
     tbody.innerHTML = filteredDonations.map(donation => `
@@ -1091,7 +1115,7 @@ function filterMoneyDonations() {
         <td>${escapeHtml(donation.siteName)}</td>
         <td>${escapeHtml(donation.nickname || donation.userId)}</td>
         <td>${escapeHtml(donation.donor || '-')}</td>
-        <td>${donation.amount ? donation.amount.toLocaleString() + '円' : '-'}</td>
+        <td>${donation.amount ? parseInt(donation.amount).toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
         <td>${donation.webPublic === 'する' ? '公開' : '非公開'}</td>
       </tr>
     `).join('');
@@ -1100,17 +1124,347 @@ function filterMoneyDonations() {
   }
 }
 
-// Instagram投稿処理
-function postToInstagram(donationIndex) {
-  const donation = allFoodDonations[donationIndex];
-  if (!donation) return;
+// ユーザーソート用のグローバル変数
+let userSortColumn = 'siteName';
+let userSortDirection = 'asc';
+
+// ユーザーソート関数
+window.sortUsers = function(column) {
+  if (userSortColumn === column) {
+    userSortDirection = userSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    userSortColumn = column;
+    userSortDirection = 'asc';
+  }
+  applyUserSort();
+}
+
+// ユーザー配列をソート
+function sortUsersArray(users) {
+  return users.sort((a, b) => {
+    let aVal = a[userSortColumn];
+    let bVal = b[userSortColumn];
+    
+    // registrationDateの場合
+    if (userSortColumn === 'registrationDate') {
+      aVal = aVal ? new Date(aVal).getTime() : 0;
+      bVal = bVal ? new Date(bVal).getTime() : 0;
+    }
+    
+    // 文字列の場合
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (userSortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+}
+
+// ユーザーソート適用
+async function applyUserSort() {
+  if (!allUsers || !Array.isArray(allUsers)) return;
   
-  const instagramUrl = prompt(`Instagram投稿URLを入力してください:\n\n寄付品名: ${donation.itemName}\n寄付元: ${donation.donor}`);
+  // 拠点一覧を取得
+  let siteOptions = '';
+  try {
+    const siteResult = await apiRequest('getSite?userId=admin');
+    if (siteResult.success && siteResult.data) {
+      const sites = siteResult.data.map(site => site['拠点名'] || site.siteName || site.name).filter(Boolean).sort();
+      siteOptions = sites.map(site => `<option value="${escapeHtml(site)}">${escapeHtml(site)}</option>`).join('');
+    }
+  } catch (error) {
+    console.error('拠点データ取得エラー:', error);
+  }
   
-  if (instagramUrl && instagramUrl.trim()) {
-    // 実際の処理ではGASにデータを送信
-    donation.instagramUrl = instagramUrl.trim();
-    loadFoodDonations(); // 表示を更新
-    showSuccess('Instagram投稿URLを設定しました');
+  const sortedUsers = sortUsersArray([...allUsers]);
+  const tbody = document.getElementById('usersList');
+  
+  if (sortedUsers.length > 0) {
+    tbody.innerHTML = sortedUsers.map(user => {
+      const userId = user.userId || user['LINE ID'] || '';
+      const currentSite = user.siteName || user['拠点名'] || '';
+      return `
+        <tr>
+          <td>
+            <select class="form-control form-control-sm site-select" data-user-id="${escapeHtml(userId)}" onchange="updateUserSiteFromSelect(this)">
+              <option value="">(拠点未選択)</option>
+              ${siteOptions}
+            </select>
+            <script>
+              // 現在の拠点を選択状態にする
+              document.querySelector('[data-user-id="${escapeHtml(userId)}"]').value = "${escapeHtml(currentSite)}";
+            </script>
+          </td>
+          <td>${escapeHtml(user.nickname || user['管理者名'] || '')}</td>
+          <td>${escapeHtml(userId)}</td>
+          <td>${user.registrationDate ? new Date(user.registrationDate).toLocaleDateString('ja-JP') : '-'}</td>
+          <td>
+            <span class="text-muted">拠点変更可能</span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    
+    // 選択状態を設定
+    sortedUsers.forEach(user => {
+      const userId = user.userId || user['LINE ID'] || '';
+      const currentSite = user.siteName || user['拠点名'] || '';
+      const selectElement = document.querySelector(`[data-user-id="${userId}"]`);
+      if (selectElement) {
+        selectElement.value = currentSite;
+      }
+    });
+  } else {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// 拠点ソート用のグローバル変数
+let siteSortColumn = 'siteName';
+let siteSortDirection = 'asc';
+
+// 拠点ソート関数
+window.sortSites = function(column) {
+  if (siteSortColumn === column) {
+    siteSortDirection = siteSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    siteSortColumn = column;
+    siteSortDirection = 'asc';
+  }
+  applySiteSort();
+}
+
+// 拠点配列をソート
+function sortSitesArray(sites) {
+  return sites.sort((a, b) => {
+    let aVal = a[siteSortColumn] || a['拠点名'] || a.siteName || a.name || '';
+    let bVal = b[siteSortColumn] || b['拠点名'] || b.siteName || b.name || '';
+    
+    // 文字列の場合
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (siteSortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+}
+
+// 拠点ソート適用
+function applySiteSort() {
+  if (!allSites || !Array.isArray(allSites)) return;
+  
+  const sortedSites = sortSitesArray([...allSites]);
+  const tbody = document.getElementById('sitesList');
+  
+  if (sortedSites.length > 0) {
+    tbody.innerHTML = sortedSites.map((site, index) => {
+      const siteName = site['拠点名'] || site.siteName || site.name || '';
+      const website = site['web'] || site.webSite || site.website || '';
+      const account = site['振込口座'] || site.transferDestination || site.account || '';
+      
+      return `
+        <tr data-site-index="${index}">
+          <td>
+            <span class="site-name-display">${escapeHtml(siteName)}</span>
+          </td>
+          <td>
+            <input type="text" class="form-control form-control-sm website-input" value="${escapeHtml(website)}" 
+                   data-field="webSite" data-site-name="${escapeHtml(siteName)}" readonly style="background-color: #f8f9fa;">
+          </td>
+          <td>
+            <input type="text" class="form-control form-control-sm account-input" value="${escapeHtml(account)}" 
+                   data-field="transferDestination" data-site-name="${escapeHtml(siteName)}" readonly style="background-color: #f8f9fa;">
+          </td>
+          <td>
+            <button class="btn btn-sm btn-primary edit-btn" onclick="toggleSiteEdit(this, ${index})">
+              <i class="bi bi-pencil"></i> 編集
+            </button>
+            <button class="btn btn-sm btn-danger save-btn d-none" onclick="saveSiteEdit(this, ${index})">
+              <i class="bi bi-check"></i> 保存
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// ログソート用のグローバル変数
+let logSortColumn = 'timestamp';
+let logSortDirection = 'desc';
+
+// ログソート関数
+window.sortLogs = function(column) {
+  if (logSortColumn === column) {
+    logSortDirection = logSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    logSortColumn = column;
+    logSortDirection = 'asc';
+  }
+  applyLogSort();
+}
+
+// ログ配列をソート
+function sortLogsArray(logs) {
+  return logs.sort((a, b) => {
+    let aVal = a[logSortColumn] || a.action;
+    let bVal = b[logSortColumn] || b.action;
+    
+    // 日付の場合
+    if (logSortColumn === 'timestamp') {
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
+    }
+    
+    // タイプの場合
+    if (logSortColumn === 'type') {
+      aVal = a.type || a.action || '';
+      bVal = b.type || b.action || '';
+    }
+    
+    // 文字列の場合
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      aVal = aVal.toLowerCase();
+      bVal = bVal.toLowerCase();
+    }
+    
+    if (logSortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
+}
+
+// ログソート適用
+function applyLogSort() {
+  if (!allLogs || !Array.isArray(allLogs)) return;
+  
+  const sortedLogs = sortLogsArray([...allLogs]);
+  const tbody = document.getElementById('logsList');
+  
+  if (sortedLogs.length > 0) {
+    tbody.innerHTML = sortedLogs.slice(0, 100).map(log => `
+      <tr>
+        <td>${new Date(log.timestamp).toLocaleString('ja-JP')}</td>
+        <td>${escapeHtml(log.type || log.action)}</td>
+        <td>${escapeHtml(log.details || log.message)}</td>
+      </tr>
+    `).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// 古いユーザー編集機能（削除済み、プルダウンに変更）
+
+// ユーザーの拠点更新
+async function updateUserSite(userId, newSiteName) {
+  try {
+    const result = await apiRequest('updateUserSite', 'POST', {
+      action: 'updateUserSite',
+      userId: userId,
+      siteName: newSiteName
+    });
+    
+    if (result.success) {
+      // ローカルデータを更新
+      const user = allUsers.find(u => u.userId === userId || u['LINE ID'] === userId);
+      if (user) {
+        user.siteName = newSiteName;
+        user['拠点名'] = newSiteName;
+        applyUserSort(); // 表示を更新
+      }
+      showSuccess('ユーザーの拠点を更新しました');
+    } else {
+      throw new Error(result.error || '更新に失敗しました');
+    }
+  } catch (error) {
+    showError('更新に失敗しました: ' + error.message);
+  }
+}
+
+// プルダウンからユーザー拠点更新
+async function updateUserSiteFromSelect(selectElement) {
+  const userId = selectElement.getAttribute('data-user-id');
+  const newSiteName = selectElement.value;
+  
+  if (userId && newSiteName) {
+    await updateUserSite(userId, newSiteName);
+  } else if (userId && newSiteName === '') {
+    // 拠点未選択の場合
+    await updateUserSite(userId, '');
+  }
+}
+
+// 拠点編集モード切り替え
+function toggleSiteEdit(button, siteIndex) {
+  const row = button.closest('tr');
+  const websiteInput = row.querySelector('.website-input');
+  const accountInput = row.querySelector('.account-input');
+  const editBtn = row.querySelector('.edit-btn');
+  const saveBtn = row.querySelector('.save-btn');
+  
+  // 編集モードに切り替え
+  websiteInput.removeAttribute('readonly');
+  websiteInput.style.backgroundColor = '#fff';
+  websiteInput.style.border = '2px solid #007bff';
+  
+  accountInput.removeAttribute('readonly');
+  accountInput.style.backgroundColor = '#fff';
+  accountInput.style.border = '2px solid #007bff';
+  
+  // ボタンを切り替え
+  editBtn.classList.add('d-none');
+  saveBtn.classList.remove('d-none');
+}
+
+// 拠点編集保存
+async function saveSiteEdit(button, siteIndex) {
+  const row = button.closest('tr');
+  const websiteInput = row.querySelector('.website-input');
+  const accountInput = row.querySelector('.account-input');
+  const editBtn = row.querySelector('.edit-btn');
+  const saveBtn = row.querySelector('.save-btn');
+  
+  const siteName = websiteInput.getAttribute('data-site-name');
+  const websiteValue = websiteInput.value.trim();
+  const accountValue = accountInput.value.trim();
+  
+  try {
+    // WebサイトとBank Accountを更新
+    await Promise.all([
+      updateSite(siteName, 'webSite', websiteValue),
+      updateSite(siteName, 'transferDestination', accountValue)
+    ]);
+    
+    // 編集モードを終了
+    websiteInput.setAttribute('readonly', 'readonly');
+    websiteInput.style.backgroundColor = '#f8f9fa';
+    websiteInput.style.border = '1px solid #ced4da';
+    
+    accountInput.setAttribute('readonly', 'readonly');
+    accountInput.style.backgroundColor = '#f8f9fa';
+    accountInput.style.border = '1px solid #ced4da';
+    
+    // ボタンを切り替え
+    editBtn.classList.remove('d-none');
+    saveBtn.classList.add('d-none');
+    
+    showSuccess('拠点情報を保存しました');
+  } catch (error) {
+    showError('保存に失敗しました: ' + error.message);
   }
 }
