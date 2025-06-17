@@ -228,12 +228,12 @@ function updateStatistics() {
   const monthFilter = document.getElementById('monthFilter').value;
   let monthReports = allReports;
   
-  // 月フィルターのみ適用
+  // 月フィルターのみ適用（開催日ベース）
   if (monthFilter) {
     monthReports = allReports.filter(report => {
-      const reportDate = new Date(report.timestamp);
-      const reportMonth = reportDate.getFullYear() + '-' + String(reportDate.getMonth() + 1).padStart(2, '0');
-      return reportMonth === monthFilter;
+      const eventDate = new Date(report.eventDate);
+      const eventMonth = eventDate.getFullYear() + '-' + String(eventDate.getMonth() + 1).padStart(2, '0');
+      return eventMonth === monthFilter;
     });
   }
   
@@ -321,12 +321,12 @@ function filterReports() {
   
   let filteredReports = allReports;
   
-  // 月フィルター
+  // 月フィルター（開催日ベース）
   if (monthFilter) {
     filteredReports = filteredReports.filter(report => {
-      const reportDate = new Date(report.timestamp);
-      const reportMonth = reportDate.getFullYear() + '-' + String(reportDate.getMonth() + 1).padStart(2, '0');
-      return reportMonth === monthFilter;
+      const eventDate = new Date(report.eventDate);
+      const eventMonth = eventDate.getFullYear() + '-' + String(eventDate.getMonth() + 1).padStart(2, '0');
+      return eventMonth === monthFilter;
     });
   }
   
@@ -1169,58 +1169,72 @@ function sortUsersArray(users) {
 async function applyUserSort() {
   if (!allUsers || !Array.isArray(allUsers)) return;
   
-  // 拠点一覧を取得
-  let siteOptions = '';
-  try {
-    const siteResult = await apiRequest('getSite?userId=admin');
-    if (siteResult.success && siteResult.data) {
-      const sites = siteResult.data.map(site => site['拠点名'] || site.siteName || site.name).filter(Boolean).sort();
-      siteOptions = sites.map(site => `<option value="${escapeHtml(site)}">${escapeHtml(site)}</option>`).join('');
-    }
-  } catch (error) {
-    console.error('拠点データ取得エラー:', error);
-  }
-  
   const sortedUsers = sortUsersArray([...allUsers]);
   const tbody = document.getElementById('usersList');
   
   if (sortedUsers.length > 0) {
-    tbody.innerHTML = sortedUsers.map(user => {
+    tbody.innerHTML = sortedUsers.map((user, index) => {
       const userId = user.userId || user['LINE ID'] || '';
       const currentSite = user.siteName || user['拠点名'] || '';
       return `
-        <tr>
+        <tr data-user-index="${index}">
           <td>
-            <select class="form-control form-control-sm site-select" data-user-id="${escapeHtml(userId)}" onchange="updateUserSiteFromSelect(this)">
+            <span class="site-display">${escapeHtml(currentSite)}</span>
+            <select class="form-control form-control-sm site-select d-none" data-user-id="${escapeHtml(userId)}">
               <option value="">(拠点未選択)</option>
-              ${siteOptions}
             </select>
-            <script>
-              // 現在の拠点を選択状態にする
-              document.querySelector('[data-user-id="${escapeHtml(userId)}"]').value = "${escapeHtml(currentSite)}";
-            </script>
           </td>
           <td>${escapeHtml(user.nickname || user['管理者名'] || '')}</td>
           <td>${escapeHtml(userId)}</td>
           <td>${user.registrationDate ? new Date(user.registrationDate).toLocaleDateString('ja-JP') : '-'}</td>
           <td>
-            <span class="text-muted">拠点変更可能</span>
+            <button class="btn btn-sm btn-primary edit-user-btn" onclick="toggleUserEdit(this, ${index})">
+              <i class="bi bi-pencil"></i> 変更
+            </button>
+            <button class="btn btn-sm btn-danger save-user-btn d-none" onclick="saveUserEdit(this, ${index})">
+              <i class="bi bi-check"></i> 保存
+            </button>
           </td>
         </tr>
       `;
     }).join('');
     
-    // 選択状態を設定
-    sortedUsers.forEach(user => {
-      const userId = user.userId || user['LINE ID'] || '';
-      const currentSite = user.siteName || user['拠点名'] || '';
-      const selectElement = document.querySelector(`[data-user-id="${userId}"]`);
-      if (selectElement) {
-        selectElement.value = currentSite;
-      }
-    });
+    // 拠点オプションを設定
+    await populateUserSiteOptions();
   } else {
     tbody.innerHTML = '<tr><td colspan="5" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// ユーザー拠点選択肢を設定
+async function populateUserSiteOptions() {
+  try {
+    const siteResult = await apiRequest('getSite?userId=admin');
+    if (siteResult.success && siteResult.data) {
+      const sites = siteResult.data.map(site => site['拠点名'] || site.siteName || site.name).filter(Boolean).sort();
+      
+      document.querySelectorAll('.site-select').forEach(select => {
+        const userId = select.getAttribute('data-user-id');
+        const user = allUsers.find(u => (u.userId || u['LINE ID']) === userId);
+        const currentSite = user ? (user.siteName || user['拠点名'] || '') : '';
+        
+        // オプションをクリア
+        select.innerHTML = '<option value="">(拠点未選択)</option>';
+        
+        // 拠点オプションを追加
+        sites.forEach(site => {
+          const option = document.createElement('option');
+          option.value = site;
+          option.textContent = site;
+          if (site === currentSite) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+      });
+    }
+  } catch (error) {
+    console.error('拠点データ取得エラー:', error);
   }
 }
 
@@ -1278,18 +1292,20 @@ function applySiteSort() {
             <span class="site-name-display">${escapeHtml(siteName)}</span>
           </td>
           <td>
-            <input type="text" class="form-control form-control-sm website-input" value="${escapeHtml(website)}" 
-                   data-field="webSite" data-site-name="${escapeHtml(siteName)}" readonly style="background-color: #f8f9fa;">
+            <span class="website-display">${escapeHtml(website)}</span>
+            <input type="text" class="form-control form-control-sm website-input d-none" value="${escapeHtml(website)}" 
+                   data-field="webSite" data-site-name="${escapeHtml(siteName)}">
           </td>
           <td>
-            <input type="text" class="form-control form-control-sm account-input" value="${escapeHtml(account)}" 
-                   data-field="transferDestination" data-site-name="${escapeHtml(siteName)}" readonly style="background-color: #f8f9fa;">
+            <span class="account-display">${escapeHtml(account)}</span>
+            <input type="text" class="form-control form-control-sm account-input d-none" value="${escapeHtml(account)}" 
+                   data-field="transferDestination" data-site-name="${escapeHtml(siteName)}">
           </td>
           <td>
-            <button class="btn btn-sm btn-primary edit-btn" onclick="toggleSiteEdit(this, ${index})">
-              <i class="bi bi-pencil"></i> 編集
+            <button class="btn btn-sm btn-primary edit-site-btn" onclick="toggleSiteEdit(this, ${index})">
+              <i class="bi bi-pencil"></i> 変更
             </button>
-            <button class="btn btn-sm btn-danger save-btn d-none" onclick="saveSiteEdit(this, ${index})">
+            <button class="btn btn-sm btn-danger save-site-btn d-none" onclick="saveSiteEdit(this, ${index})">
               <i class="bi bi-check"></i> 保存
             </button>
           </td>
@@ -1396,34 +1412,75 @@ async function updateUserSite(userId, newSiteName) {
   }
 }
 
-// プルダウンからユーザー拠点更新
-async function updateUserSiteFromSelect(selectElement) {
-  const userId = selectElement.getAttribute('data-user-id');
-  const newSiteName = selectElement.value;
+// ユーザー編集モード切り替え
+function toggleUserEdit(button, userIndex) {
+  const row = button.closest('tr');
+  const siteDisplay = row.querySelector('.site-display');
+  const siteSelect = row.querySelector('.site-select');
+  const editBtn = row.querySelector('.edit-user-btn');
+  const saveBtn = row.querySelector('.save-user-btn');
   
-  if (userId && newSiteName) {
+  // 編集モードに切り替え
+  siteDisplay.classList.add('d-none');
+  siteSelect.classList.remove('d-none');
+  siteSelect.style.border = '2px solid #007bff';
+  
+  // ボタンを切り替え
+  editBtn.classList.add('d-none');
+  saveBtn.classList.remove('d-none');
+}
+
+// ユーザー編集保存
+async function saveUserEdit(button, userIndex) {
+  const row = button.closest('tr');
+  const siteDisplay = row.querySelector('.site-display');
+  const siteSelect = row.querySelector('.site-select');
+  const editBtn = row.querySelector('.edit-user-btn');
+  const saveBtn = row.querySelector('.save-user-btn');
+  
+  const userId = siteSelect.getAttribute('data-user-id');
+  const newSiteName = siteSelect.value;
+  
+  try {
+    // データを更新
     await updateUserSite(userId, newSiteName);
-  } else if (userId && newSiteName === '') {
-    // 拠点未選択の場合
-    await updateUserSite(userId, '');
+    
+    // 表示を更新
+    siteDisplay.textContent = newSiteName || '(拠点未選択)';
+    
+    // 編集モードを終了
+    siteDisplay.classList.remove('d-none');
+    siteSelect.classList.add('d-none');
+    siteSelect.style.border = '1px solid #ced4da';
+    
+    // ボタンを切り替え
+    editBtn.classList.remove('d-none');
+    saveBtn.classList.add('d-none');
+    
+    showSuccess('ユーザー拠点を更新しました');
+  } catch (error) {
+    showError('保存に失敗しました: ' + error.message);
   }
 }
 
 // 拠点編集モード切り替え
 function toggleSiteEdit(button, siteIndex) {
   const row = button.closest('tr');
+  const websiteDisplay = row.querySelector('.website-display');
+  const accountDisplay = row.querySelector('.account-display');
   const websiteInput = row.querySelector('.website-input');
   const accountInput = row.querySelector('.account-input');
-  const editBtn = row.querySelector('.edit-btn');
-  const saveBtn = row.querySelector('.save-btn');
+  const editBtn = row.querySelector('.edit-site-btn');
+  const saveBtn = row.querySelector('.save-site-btn');
   
   // 編集モードに切り替え
-  websiteInput.removeAttribute('readonly');
-  websiteInput.style.backgroundColor = '#fff';
+  websiteDisplay.classList.add('d-none');
+  accountDisplay.classList.add('d-none');
+  
+  websiteInput.classList.remove('d-none');
   websiteInput.style.border = '2px solid #007bff';
   
-  accountInput.removeAttribute('readonly');
-  accountInput.style.backgroundColor = '#fff';
+  accountInput.classList.remove('d-none');
   accountInput.style.border = '2px solid #007bff';
   
   // ボタンを切り替え
@@ -1434,10 +1491,12 @@ function toggleSiteEdit(button, siteIndex) {
 // 拠点編集保存
 async function saveSiteEdit(button, siteIndex) {
   const row = button.closest('tr');
+  const websiteDisplay = row.querySelector('.website-display');
+  const accountDisplay = row.querySelector('.account-display');
   const websiteInput = row.querySelector('.website-input');
   const accountInput = row.querySelector('.account-input');
-  const editBtn = row.querySelector('.edit-btn');
-  const saveBtn = row.querySelector('.save-btn');
+  const editBtn = row.querySelector('.edit-site-btn');
+  const saveBtn = row.querySelector('.save-site-btn');
   
   const siteName = websiteInput.getAttribute('data-site-name');
   const websiteValue = websiteInput.value.trim();
@@ -1450,13 +1509,18 @@ async function saveSiteEdit(button, siteIndex) {
       updateSite(siteName, 'transferDestination', accountValue)
     ]);
     
+    // 表示を更新
+    websiteDisplay.textContent = websiteValue;
+    accountDisplay.textContent = accountValue;
+    
     // 編集モードを終了
-    websiteInput.setAttribute('readonly', 'readonly');
-    websiteInput.style.backgroundColor = '#f8f9fa';
+    websiteDisplay.classList.remove('d-none');
+    accountDisplay.classList.remove('d-none');
+    
+    websiteInput.classList.add('d-none');
     websiteInput.style.border = '1px solid #ced4da';
     
-    accountInput.setAttribute('readonly', 'readonly');
-    accountInput.style.backgroundColor = '#f8f9fa';
+    accountInput.classList.add('d-none');
     accountInput.style.border = '1px solid #ced4da';
     
     // ボタンを切り替え
