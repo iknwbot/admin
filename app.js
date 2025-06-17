@@ -568,66 +568,97 @@ async function loadLogs() {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
       // 古い形式のログを新しい形式に変換
-      allLogs = allLogs.map(log => {
+      allLogs = allLogs.map((log, index) => {
+        console.log(`Processing log ${index}:`, log);
+        
         // 新形式の場合はそのまま
         if (log['タイムスタンプ'] || log.timestamp) {
+          console.log(`Log ${index} is already in new format`);
           return log;
         }
         
         // 古い形式の場合は変換
         const keys = Object.keys(log);
-        if (keys.length >= 3) {
-          // 最初のキーがタイムスタンプ、2番目が種類/ログ内容、3番目が詳細の可能性
-          const timestampKey = keys[0];
-          const typeOrMessageKey = keys[1];
-          const detailsKey = keys[2];
+        console.log(`Log ${index} keys:`, keys);
+        console.log(`Log ${index} values:`, Object.values(log));
+        
+        if (keys.length >= 2) {
+          // 実際のログ形式を分析
+          // 例: {"Mon May 05 2025 16:38:52 GMT+0900 (日本標準時)": "2025-06-17T08:36:41.303Z", "✅ いちいちいちパントリー : 活動報告が登録されました": "SUCCESS", "": "ステータス更新..."}
           
-          // タイムスタンプを解析
-          let timestamp = log[timestampKey];
-          if (timestampKey.includes('GMT')) {
-            timestamp = new Date(timestampKey);
+          let timestamp, type, category, details;
+          
+          // 1番目のキー: タイムスタンプっぽい文字列
+          const firstKey = keys[0];
+          const firstValue = log[firstKey];
+          
+          if (firstKey.includes('GMT') || firstKey.includes('2025')) {
+            // キー自体がタイムスタンプの場合
+            timestamp = new Date(firstKey);
+          } else {
+            // 値がタイムスタンプの場合
+            timestamp = new Date(firstValue);
           }
           
-          // 種類とカテゴリを推測
-          let type = 'INFO';
-          let category = '管理画面';
-          let details = '';
+          // 2番目以降から種類と詳細を抽出
+          let typeKey = keys[1];
+          let typeValue = log[typeKey];
           
-          // typeOrMessageKeyから種類を推測
-          if (typeOrMessageKey.includes('✅') || log[typeOrMessageKey] === 'SUCCESS') {
+          // 3番目があれば詳細
+          let detailsValue = keys[2] ? log[keys[2]] : '';
+          
+          // 種類を判定
+          if (typeValue === 'SUCCESS' || typeKey.includes('✅')) {
             type = 'SUCCESS';
-          } else if (typeOrMessageKey.includes('❌') || log[typeOrMessageKey] === 'ERROR') {
+          } else if (typeValue === 'ERROR' || typeKey.includes('❌')) {
             type = 'ERROR';
-          } else if (typeOrMessageKey.includes('⚠') || log[typeOrMessageKey] === 'WARNING') {
+          } else if (typeValue === 'WARNING' || typeKey.includes('⚠')) {
             type = 'WARNING';
+          } else {
+            type = 'INFO';
           }
           
           // カテゴリを推測
-          if (typeOrMessageKey.includes('活動報告') || log[detailsKey].includes('活動報告')) {
+          const allText = (typeKey + ' ' + detailsValue).toLowerCase();
+          if (allText.includes('活動報告') || allText.includes('report')) {
             category = '活動報告';
-          } else if (typeOrMessageKey.includes('寄付') || log[detailsKey].includes('寄付')) {
+          } else if (allText.includes('寄付') || allText.includes('donation')) {
             category = '寄付';
-          } else if (typeOrMessageKey.includes('ユーザ') || log[detailsKey].includes('ユーザ')) {
+          } else if (allText.includes('ユーザ') || allText.includes('user')) {
             category = 'ユーザ';
-          } else if (typeOrMessageKey.includes('振込') || log[detailsKey].includes('振込')) {
+          } else if (allText.includes('振込') || allText.includes('transfer')) {
             category = '振込確認';
-          } else if (log[detailsKey].includes('ステータス更新')) {
+          } else if (allText.includes('ステータス更新') || allText.includes('管理')) {
+            category = '管理画面';
+          } else {
             category = '管理画面';
           }
           
-          // 詳細を設定
-          details = log[detailsKey] || typeOrMessageKey;
+          // 詳細メッセージを設定
+          if (detailsValue) {
+            details = detailsValue;
+          } else if (typeKey && typeKey !== '') {
+            details = typeKey;
+          } else {
+            details = 'ログメッセージ';
+          }
           
-          return {
+          const converted = {
             'タイムスタンプ': timestamp,
             '種類': type,
             'カテゴリ': category,
             '詳細': details
           };
+          
+          console.log(`Log ${index} converted:`, converted);
+          return converted;
         }
         
+        console.log(`Log ${index} could not be converted, returning as-is`);
         return log;
       });
+      
+      console.log('All logs after conversion:', allLogs);
       
       // 最近30日のログのみを取得
       allLogs = allLogs.filter(log => {
