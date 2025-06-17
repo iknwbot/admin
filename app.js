@@ -1390,26 +1390,73 @@ function applyLogSort() {
 async function updateUserSite(userId, newSiteName) {
   console.log('ユーザー拠点更新開始:', { userId, newSiteName });
   
-  const result = await apiRequest('updateUser', 'POST', {
-    action: 'updateUser',
-    userId: userId,
-    siteName: newSiteName
-  });
+  // 複数のAPIパターンを試す
+  let result;
+  let lastError = null;
   
-  console.log('GAS更新結果:', result);
-  
-  if (result.success) {
-    // ローカルデータを更新
-    const user = allUsers.find(u => u.userId === userId || u['LINE ID'] === userId);
-    if (user) {
-      user.siteName = newSiteName;
-      user['拠点名'] = newSiteName;
+  // パターン1: updateUserSite
+  try {
+    result = await apiRequest('updateUserSite', 'POST', {
+      action: 'updateUserSite',
+      userId: userId,
+      siteName: newSiteName
+    });
+    console.log('updateUserSite結果:', result);
+    if (result.success) {
+      return await handleUserUpdateSuccess(userId, newSiteName);
     }
-    return true;
-  } else {
-    console.error('GAS更新エラー:', result.error);
-    throw new Error(result.error || 'GASバックエンドエラー: ユーザー拠点更新API未対応');
+  } catch (error) {
+    console.log('updateUserSite失敗:', error.message);
+    lastError = error;
   }
+  
+  // パターン2: updateUser
+  try {
+    result = await apiRequest('updateUser', 'POST', {
+      action: 'updateUser',
+      userId: userId,
+      siteName: newSiteName
+    });
+    console.log('updateUser結果:', result);
+    if (result.success) {
+      return await handleUserUpdateSuccess(userId, newSiteName);
+    }
+  } catch (error) {
+    console.log('updateUser失敗:', error.message);
+    lastError = error;
+  }
+  
+  // パターン3: userUpdate
+  try {
+    result = await apiRequest('userUpdate', 'POST', {
+      action: 'userUpdate',
+      userId: userId,
+      siteName: newSiteName
+    });
+    console.log('userUpdate結果:', result);
+    if (result.success) {
+      return await handleUserUpdateSuccess(userId, newSiteName);
+    }
+  } catch (error) {
+    console.log('userUpdate失敗:', error.message);
+    lastError = error;
+  }
+  
+  // すべて失敗した場合
+  console.error('全パターン失敗。GASバックエンドにユーザー拠点更新APIが未実装の可能性');
+  throw new Error('GASバックエンドエラー: ユーザー拠点更新API未実装。管理者にGASの拡張が必要です。');
+}
+
+// ユーザー更新成功時の処理
+async function handleUserUpdateSuccess(userId, newSiteName) {
+  console.log('ユーザー拠点更新成功');
+  // ローカルデータを更新
+  const user = allUsers.find(u => u.userId === userId || u['LINE ID'] === userId);
+  if (user) {
+    user.siteName = newSiteName;
+    user['拠点名'] = newSiteName;
+  }
+  return true;
 }
 
 // ユーザー編集モード切り替え
