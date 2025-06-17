@@ -4,6 +4,9 @@ let allReports = [];
 let allFoodDonations = [];
 let allMoneyDonations = [];
 let allLogs = [];
+let filteredLogs = [];
+let currentLogPage = 1;
+const logsPerPage = 20;
 let allUsers = [];
 let allSites = [];
 
@@ -31,6 +34,12 @@ window.onload = async function() {
     }
     filterReports();
   };
+  
+  // ログ関連のグローバル関数
+  window.applyLogFilters = applyLogFilters;
+  window.clearLogFilters = clearLogFilters;
+  window.changeLogPage = changeLogPage;
+  window.sortLogs = sortLogs;
 };
 
 // フィルター初期化
@@ -537,20 +546,35 @@ async function loadLogs() {
   const loading = container.querySelector('.loading');
   const errorMsg = container.querySelector('.error-message');
   const table = document.getElementById('logsTable');
+  const pagination = document.getElementById('logPagination');
   
   loading.style.display = 'block';
   errorMsg.style.display = 'none';
   table.style.display = 'none';
+  pagination.style.display = 'none';
   
   try {
     const result = await apiRequest('getLogs');
     
     if (result.success || result.data) {
       allLogs = result.data || result.logs || [];
-      applyLogSort();
+      
+      // 最近30日のログのみを取得
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      allLogs = allLogs.filter(log => {
+        const logDate = new Date(log['タイムスタンプ'] || log.timestamp);
+        return logDate >= thirtyDaysAgo;
+      });
+      
+      currentLogPage = 1;
+      updateLogStatistics();
+      applyLogFilters();
       
       loading.style.display = 'none';
       table.style.display = 'table';
+      pagination.style.display = 'block';
     } else {
       throw new Error(result.error || 'データ取得エラー');
     }
@@ -1175,7 +1199,7 @@ function renderTransferTable(filteredData) {
                 </tbody>
               </table>
             ` : `
-              <div class="text-center text-muted">
+              <div class="text-start text-muted">
                 活動報告なし
               </div>
             `}
@@ -2001,24 +2025,176 @@ function sortLogsArray(logs) {
   });
 }
 
-// ログソート適用
-function applyLogSort() {
-  if (!allLogs || !Array.isArray(allLogs)) return;
+// ログ統計更新
+function updateLogStatistics() {
+  const totalLogs = allLogs.length;
+  const errorLogs = allLogs.filter(log => (log['種類'] || log.type) === 'ERROR').length;
+  const warningLogs = allLogs.filter(log => (log['種類'] || log.type) === 'WARNING').length;
+  const successLogs = allLogs.filter(log => (log['種類'] || log.type) === 'SUCCESS').length;
   
-  const sortedLogs = sortLogsArray([...allLogs]);
-  const tbody = document.getElementById('logsList');
+  document.getElementById('totalLogs').textContent = totalLogs;
+  document.getElementById('errorLogs').textContent = errorLogs;
+  document.getElementById('warningLogs').textContent = warningLogs;
+  document.getElementById('successLogs').textContent = successLogs;
+}
+
+// ログフィルター適用
+function applyLogFilters() {
+  const typeFilter = document.getElementById('logTypeFilter').value;
+  const categoryFilter = document.getElementById('logCategoryFilter').value;
+  const dateFilter = parseInt(document.getElementById('logDateFilter').value);
   
-  if (sortedLogs.length > 0) {
-    tbody.innerHTML = sortedLogs.slice(0, 100).map(log => `
-      <tr>
-        <td>${new Date(log.timestamp).toLocaleString('ja-JP')}</td>
-        <td>${escapeHtml(log.type || log.action)}</td>
-        <td>${escapeHtml(log.details || log.message)}</td>
-      </tr>
-    `).join('');
-  } else {
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center">データがありません</td></tr>';
+  let filtered = [...allLogs];
+  
+  // 種類フィルター
+  if (typeFilter) {
+    filtered = filtered.filter(log => (log['種類'] || log.type) === typeFilter);
   }
+  
+  // カテゴリフィルター
+  if (categoryFilter) {
+    filtered = filtered.filter(log => (log['カテゴリ'] || log.category) === categoryFilter);
+  }
+  
+  // 日付フィルター
+  if (dateFilter) {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() - dateFilter);
+    
+    filtered = filtered.filter(log => {
+      const logDate = new Date(log['タイムスタンプ'] || log.timestamp);
+      return logDate >= targetDate;
+    });
+  }
+  
+  filteredLogs = filtered;
+  currentLogPage = 1;
+  renderLogTable();
+  updateLogPagination();
+}
+
+// ログフィルタークリア
+function clearLogFilters() {
+  document.getElementById('logTypeFilter').value = '';
+  document.getElementById('logCategoryFilter').value = '';
+  document.getElementById('logDateFilter').value = '30';
+  applyLogFilters();
+}
+
+// ログテーブル描画
+function renderLogTable() {
+  const tbody = document.getElementById('logsList');
+  const startIndex = (currentLogPage - 1) * logsPerPage;
+  const endIndex = startIndex + logsPerPage;
+  const pageData = filteredLogs.slice(startIndex, endIndex);
+  
+  if (pageData.length > 0) {
+    tbody.innerHTML = pageData.map(log => {
+      const timestamp = new Date(log['タイムスタンプ'] || log.timestamp).toLocaleString('ja-JP');
+      const type = log['種類'] || log.type || '';
+      const category = log['カテゴリ'] || log.category || '';
+      const details = log['詳細'] || log.details || log.message || '';
+      
+      const typeClass = getLogTypeClass(type);
+      
+      return `
+        <tr>
+          <td>${timestamp}</td>
+          <td><span class="badge ${typeClass}">${escapeHtml(type)}</span></td>
+          <td>${escapeHtml(category)}</td>
+          <td>${escapeHtml(details)}</td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center">データがありません</td></tr>';
+  }
+}
+
+// ログタイプのCSSクラス取得
+function getLogTypeClass(type) {
+  switch (type) {
+    case 'SUCCESS': return 'bg-success';
+    case 'ERROR': return 'bg-danger';
+    case 'WARNING': return 'bg-warning text-dark';
+    case 'INFO': return 'bg-info';
+    case 'DEBUG': return 'bg-secondary';
+    default: return 'bg-light text-dark';
+  }
+}
+
+// ログページネーション更新
+function updateLogPagination() {
+  const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+  const startIndex = (currentLogPage - 1) * logsPerPage + 1;
+  const endIndex = Math.min(currentLogPage * logsPerPage, filteredLogs.length);
+  
+  document.getElementById('logPageNumber').textContent = currentLogPage;
+  document.getElementById('logPageInfo').textContent = 
+    `${startIndex}-${endIndex} / ${filteredLogs.length}件`;
+  
+  const prevPage = document.getElementById('logPrevPage');
+  const nextPage = document.getElementById('logNextPage');
+  
+  if (currentLogPage <= 1) {
+    prevPage.classList.add('disabled');
+  } else {
+    prevPage.classList.remove('disabled');
+  }
+  
+  if (currentLogPage >= totalPages) {
+    nextPage.classList.add('disabled');
+  } else {
+    nextPage.classList.remove('disabled');
+  }
+}
+
+// ログページ変更
+function changeLogPage(page) {
+  const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+  
+  if (page >= 1 && page <= totalPages) {
+    currentLogPage = page;
+    renderLogTable();
+    updateLogPagination();
+  }
+}
+
+// ログソート
+function sortLogs(column) {
+  if (window.sortColumn === column) {
+    window.sortDirection = window.sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    window.sortColumn = column;
+    window.sortDirection = 'desc';
+  }
+  
+  filteredLogs.sort((a, b) => {
+    let aVal, bVal;
+    
+    switch (column) {
+      case 'timestamp':
+        aVal = new Date(a['タイムスタンプ'] || a.timestamp);
+        bVal = new Date(b['タイムスタンプ'] || b.timestamp);
+        break;
+      case 'type':
+        aVal = a['種類'] || a.type || '';
+        bVal = b['種類'] || b.type || '';
+        break;
+      case 'category':
+        aVal = a['カテゴリ'] || a.category || '';
+        bVal = b['カテゴリ'] || b.category || '';
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aVal < bVal) return window.sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return window.sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+  
+  renderLogTable();
 }
 
 // 古いユーザー編集機能（削除済み、プルダウンに変更）

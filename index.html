@@ -464,25 +464,129 @@
           <!-- ログ -->
           <div id="logs" class="section" style="display:none;">
             <h2>ログ</h2>
-            <div class="table-container mt-4">
+            
+            <!-- ログ統計 -->
+            <div class="row mt-3 mb-4">
+              <div class="col-md-3">
+                <div class="card stat-card">
+                  <div class="card-body">
+                    <h6 class="card-title">総ログ数</h6>
+                    <h5 class="text-primary" id="totalLogs">0</h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card">
+                  <div class="card-body">
+                    <h6 class="card-title">エラー数</h6>
+                    <h5 class="text-danger" id="errorLogs">0</h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card">
+                  <div class="card-body">
+                    <h6 class="card-title">警告数</h6>
+                    <h5 class="text-warning" id="warningLogs">0</h5>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="card stat-card">
+                  <div class="card-body">
+                    <h6 class="card-title">成功数</h6>
+                    <h5 class="text-success" id="successLogs">0</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- フィルター -->
+            <div class="row mb-3">
+              <div class="col-md-3">
+                <label class="form-label">ログ種類</label>
+                <select class="form-select" id="logTypeFilter" onchange="applyLogFilters()">
+                  <option value="">すべて</option>
+                  <option value="SUCCESS">成功</option>
+                  <option value="ERROR">エラー</option>
+                  <option value="WARNING">警告</option>
+                  <option value="INFO">情報</option>
+                  <option value="DEBUG">デバッグ</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">カテゴリ</label>
+                <select class="form-select" id="logCategoryFilter" onchange="applyLogFilters()">
+                  <option value="">すべて</option>
+                  <option value="活動報告">活動報告</option>
+                  <option value="寄付">寄付</option>
+                  <option value="ユーザ">ユーザ</option>
+                  <option value="振込確認">振込確認</option>
+                  <option value="管理画面">管理画面</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">日付範囲</label>
+                <select class="form-select" id="logDateFilter" onchange="applyLogFilters()">
+                  <option value="30">過去30日</option>
+                  <option value="7">過去7日</option>
+                  <option value="1">今日</option>
+                </select>
+              </div>
+              <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-outline-secondary me-2" onclick="clearLogFilters()">
+                  <i class="bi bi-arrow-clockwise"></i> クリア
+                </button>
+                <button class="btn btn-primary" onclick="loadLogs()">
+                  <i class="bi bi-arrow-clockwise"></i> 更新
+                </button>
+              </div>
+            </div>
+
+            <div class="table-container">
               <div class="loading">
                 <div class="spinner-border" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
-                <p>データを読み込んでいます...</p>
+                <p>ログを読み込んでいます...</p>
               </div>
               <div class="error-message"></div>
               <table class="table" id="logsTable" style="display:none;">
                 <thead>
                   <tr>
-                    <th style="width: 180px; cursor: pointer;" onclick="sortLogs('timestamp')">タイムスタンプ <i class="bi bi-arrow-down-up"></i></th>
-                    <th style="width: 120px; cursor: pointer;" onclick="sortLogs('type')">種類 <i class="bi bi-arrow-down-up"></i></th>
+                    <th style="width: 180px; cursor: pointer;" onclick="sortLogs('timestamp')">
+                      タイムスタンプ <i class="bi bi-arrow-down-up"></i>
+                    </th>
+                    <th style="width: 100px; cursor: pointer;" onclick="sortLogs('type')">
+                      種類 <i class="bi bi-arrow-down-up"></i>
+                    </th>
+                    <th style="width: 120px; cursor: pointer;" onclick="sortLogs('category')">
+                      カテゴリ <i class="bi bi-arrow-down-up"></i>
+                    </th>
                     <th>詳細</th>
                   </tr>
                 </thead>
                 <tbody id="logsList">
                 </tbody>
               </table>
+              
+              <!-- ページネーション -->
+              <nav class="mt-3" id="logPagination" style="display:none;">
+                <ul class="pagination justify-content-center">
+                  <li class="page-item" id="logPrevPage">
+                    <a class="page-link" href="#" onclick="changeLogPage(currentLogPage - 1)">前へ</a>
+                  </li>
+                  <li class="page-item active" id="logCurrentPage">
+                    <span class="page-link" id="logPageNumber">1</span>
+                  </li>
+                  <li class="page-item" id="logNextPage">
+                    <a class="page-link" href="#" onclick="changeLogPage(currentLogPage + 1)">次へ</a>
+                  </li>
+                </ul>
+                <div class="text-center text-muted mt-2">
+                  <small id="logPageInfo">1-20 / 100件</small>
+                </div>
+              </nav>
             </div>
           </div>
 
