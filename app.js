@@ -947,28 +947,32 @@ async function loadTransferConfirm() {
 function generateTransferData(reports, sites) {
   const siteMap = new Map();
   
-  // 拠点情報をマップに格納
+  // 拠点情報をマップに格納（全拠点を含む）
   sites.forEach(site => {
     const siteName = site['拠点名'] || site.siteName || site.name || '';
-    siteMap.set(siteName, {
-      name: siteName,
-      account: site['振込口座'] || site.transferDestination || site.account || '口座情報なし',
-      reports: []
-    });
+    if (siteName) {
+      siteMap.set(siteName, {
+        name: siteName,
+        account: site['振込口座'] || site.transferDestination || site.account || '口座情報なし',
+        reports: []
+      });
+    }
   });
   
   // 活動報告を拠点別に分類
   reports.forEach(report => {
     const siteName = report.siteName;
-    if (siteMap.has(siteName)) {
-      siteMap.get(siteName).reports.push(report);
-    } else {
-      // 拠点データにない場合は新規作成
-      siteMap.set(siteName, {
-        name: siteName,
-        account: '口座情報なし',
-        reports: [report]
-      });
+    if (siteName) {
+      if (siteMap.has(siteName)) {
+        siteMap.get(siteName).reports.push(report);
+      } else {
+        // 拠点データにない場合は新規作成
+        siteMap.set(siteName, {
+          name: siteName,
+          account: '口座情報なし',
+          reports: [report]
+        });
+      }
     }
   });
   
@@ -1041,16 +1045,20 @@ function applyTransferFilters() {
     filteredData = filteredData.filter(siteData => siteData.name === siteFilter);
   }
   
-  // 要確認フィルターの場合は振込OKのレポートがない拠点も表示
+  // ステータスフィルターに応じた表示制御
   if (statusFilter === '要確認') {
     filteredData = filteredData.filter(siteData => {
       const hasOkReports = siteData.reports.some(report => report.processingFlag === '振込OK');
-      return !hasOkReports; // 振込OKのレポートがない拠点のみ
+      const hasCompletedReports = siteData.reports.some(report => report.processingFlag === '完了');
+      return !hasOkReports && !hasCompletedReports && siteData.reports.length > 0;
     });
-  } else {
-    // 空の拠点を除外（レポートがない場合）
+  } else if (statusFilter === '活動なし') {
+    filteredData = filteredData.filter(siteData => siteData.reports.length === 0);
+  } else if (statusFilter) {
+    // 特定のステータスのレポートがある拠点のみ表示
     filteredData = filteredData.filter(siteData => siteData.reports.length > 0);
   }
+  // フィルターなしの場合は全て表示（活動なしも含む）
   
   // 統計を更新
   updateTransferStatistics(filteredData);
@@ -1074,10 +1082,10 @@ function updateTransferStatistics(filteredData) {
     siteData.reports.length === 0
   ).length;
   
-  // 総振込金額の計算（NaN対策を追加）
+  // 総振込金額の計算（全ステータスを含む）
   const totalAmount = filteredData.reduce((total, siteData) => {
     return total + siteData.reports
-      .filter(report => report.processingFlag === '振込OK')
+      .filter(report => ['振込OK', '振込NG', '金額確定まち', '完了'].includes(report.processingFlag))
       .reduce((sum, report) => {
         // 金額を確実に数値として取得
         let amount = 0;
@@ -1108,8 +1116,13 @@ function renderTransferTable(filteredData) {
   
   container.innerHTML = filteredData.map((siteData, index) => {
     const okReports = siteData.reports.filter(report => report.processingFlag === '振込OK');
-    const totalAmount = okReports.reduce((sum, report) => {
-      // 金額を確実に数値として取得
+    const completedReports = siteData.reports.filter(report => report.processingFlag === '完了');
+    const allRelevantReports = siteData.reports.filter(report => 
+      ['振込OK', '振込NG', '金額確定まち', '完了'].includes(report.processingFlag)
+    );
+    
+    // 全ての対象レポートから合計金額を計算
+    const totalAmount = allRelevantReports.reduce((sum, report) => {
       let amount = 0;
       if (report.amount !== undefined && report.amount !== null) {
         const amountStr = String(report.amount).replace(/[^0-9.-]/g, '');
@@ -1118,8 +1131,12 @@ function renderTransferTable(filteredData) {
       }
       return sum + amount;
     }, 0);
+    
+    // ボタンの状態を決定
     const hasTransferData = okReports.length > 0;
-    const activityCount = okReports.length;
+    const isCompleted = completedReports.length > 0 && okReports.length === 0;
+    const hasActivity = siteData.reports.length > 0;
+    const activityCount = allRelevantReports.length;
     
     return `
       <div class="card mb-3">
@@ -1129,33 +1146,39 @@ function renderTransferTable(filteredData) {
         <div class="card-body">
           <!-- 活動報告一覧 -->
           <div class="table-responsive mb-3">
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>開催日</th>
-                  <th>開催タイプ</th>
-                  <th>金額</th>
-                  <th>ステータス</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${siteData.reports.map(report => `
+            ${hasActivity ? `
+              <table class="table table-sm">
+                <thead>
                   <tr>
-                    <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
-                    <td>${escapeHtml(report.eventType)}</td>
-                    <td>${(() => {
-                      const amount = parseFloat(String(report.amount || '0').replace(/[^0-9.-]/g, ''));
-                      return isNaN(amount) || amount === 0 ? '-' : Math.floor(amount).toLocaleString() + '円';
-                    })()}</td>
-                    <td>
-                      <span class="badge ${getStatusBadgeClass(report.processingFlag || '投稿まち')}">
-                        ${getStatusIcon(report.processingFlag || '投稿まち')} ${report.processingFlag || '投稿まち'}
-                      </span>
-                    </td>
+                    <th>開催日</th>
+                    <th>開催タイプ</th>
+                    <th>金額</th>
+                    <th>ステータス</th>
                   </tr>
-                `).join('')}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  ${siteData.reports.map(report => `
+                    <tr>
+                      <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
+                      <td>${escapeHtml(report.eventType)}</td>
+                      <td>${(() => {
+                        const amount = parseFloat(String(report.amount || '0').replace(/[^0-9.-]/g, ''));
+                        return isNaN(amount) || amount === 0 ? '-' : Math.floor(amount).toLocaleString() + '円';
+                      })()}</td>
+                      <td>
+                        <span class="badge ${getStatusBadgeClass(report.processingFlag || '投稿まち')}">
+                          ${getStatusIcon(report.processingFlag || '投稿まち')} ${report.processingFlag || '投稿まち'}
+                        </span>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : `
+              <div class="alert alert-warning text-center">
+                <i class="bi bi-exclamation-triangle"></i> 活動報告なし
+              </div>
+            `}
           </div>
           
           <!-- 合計と振込情報 -->
@@ -1175,9 +1198,17 @@ function renderTransferTable(filteredData) {
                   `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${totalAmount}, ${activityCount})">
                     <i class="bi bi-bank"></i> 振込完了
                   </button>` :
-                  `<button class="btn btn-danger" onclick="showCheckRequired('${escapeHtml(siteData.name)}')">
-                    <i class="bi bi-exclamation-triangle"></i> 要確認
-                  </button>`
+                  isCompleted ?
+                    `<button class="btn btn-secondary" disabled>
+                      <i class="bi bi-check-circle"></i> 完了
+                    </button>` :
+                    !hasActivity ?
+                      `<button class="btn btn-warning" onclick="showCheckRequired('${escapeHtml(siteData.name)}')">
+                        <i class="bi bi-exclamation-triangle"></i> 活動なし
+                      </button>` :
+                      `<button class="btn btn-danger" onclick="showCheckRequired('${escapeHtml(siteData.name)}')">
+                        <i class="bi bi-exclamation-triangle"></i> 要確認
+                      </button>`
                 }
               </div>
             </div>
@@ -1205,7 +1236,7 @@ function showTransferConfirm(siteName, account, amount, activityCount) {
   const modalBody = document.getElementById('transferConfirmModalBody');
   
   modalBody.innerHTML = `
-    <div class="text-center">
+    <div class="text-start">
       <div class="mb-3">
         <h6 class="text-primary">${escapeHtml(siteName)}</h6>
         <p class="mb-2">への振り込み先</p>
