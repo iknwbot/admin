@@ -750,7 +750,7 @@ async function executeStatusChange() {
 }
 
 // シンプルなステータス変更（プルダウン用）
-async function changeReportStatus(selectElement, reportIndex) {
+function changeReportStatus(selectElement, reportIndex) {
   const newStatus = selectElement.value;
   const originalStatus = selectElement.getAttribute('data-original-status');
   const report = allReports[reportIndex];
@@ -764,6 +764,61 @@ async function changeReportStatus(selectElement, reportIndex) {
   if (newStatus === originalStatus) {
     return; // 変更なし
   }
+  
+  // 確認モーダルを表示
+  showStatusConfirmModal(report, originalStatus, newStatus, selectElement, reportIndex);
+}
+
+// ステータス変更確認モーダル表示
+function showStatusConfirmModal(report, oldStatus, newStatus, selectElement, reportIndex) {
+  const modalBody = document.getElementById('statusConfirmModalBody');
+  
+  modalBody.innerHTML = `
+    <div class="mb-3">
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="fw-bold" style="width: 80px;">拠点名:</td>
+          <td>${escapeHtml(report.siteName)}</td>
+        </tr>
+        <tr>
+          <td class="fw-bold">開催日:</td>
+          <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
+        </tr>
+        <tr>
+          <td class="fw-bold">金額:</td>
+          <td>${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '金額未確定'}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="text-center">
+      <p class="mb-3">
+        ステータスを 
+        <span class="badge bg-secondary">${oldStatus}</span> から 
+        <span class="badge bg-primary">${newStatus}</span> へ変更します
+      </p>
+      <p class="mb-0 text-muted">よろしいですか？</p>
+    </div>
+  `;
+  
+  // グローバル変数に情報を保存
+  window.pendingStatusChangeData = {
+    report,
+    oldStatus,
+    newStatus,
+    selectElement,
+    reportIndex
+  };
+  
+  // モーダル表示
+  const modal = new bootstrap.Modal(document.getElementById('statusConfirmModal'));
+  modal.show();
+}
+
+// ステータス変更確定処理
+async function confirmStatusChange() {
+  if (!window.pendingStatusChangeData) return;
+  
+  const { report, newStatus, selectElement, reportIndex } = window.pendingStatusChangeData;
   
   try {
     const result = await apiRequest('updateReportStatus', 'POST', {
@@ -782,6 +837,10 @@ async function changeReportStatus(selectElement, reportIndex) {
       // 統計を更新
       updateStatistics();
       
+      // モーダルを閉じる
+      const modal = bootstrap.Modal.getInstance(document.getElementById('statusConfirmModal'));
+      if (modal) modal.hide();
+      
       showSuccess(`ステータスを「${newStatus}」に更新しました`);
     } else {
       throw new Error(result.error || '更新に失敗しました');
@@ -789,8 +848,21 @@ async function changeReportStatus(selectElement, reportIndex) {
   } catch (error) {
     showError('更新に失敗しました: ' + error.message);
     // エラー時は元の値に戻す
-    selectElement.value = originalStatus;
+    selectElement.value = selectElement.getAttribute('data-original-status');
+  } finally {
+    window.pendingStatusChangeData = null;
   }
+}
+
+// ステータス変更キャンセル処理
+function cancelStatusChange() {
+  if (!window.pendingStatusChangeData) return;
+  
+  const { selectElement } = window.pendingStatusChangeData;
+  // 元の値に戻す
+  selectElement.value = selectElement.getAttribute('data-original-status');
+  
+  window.pendingStatusChangeData = null;
 }
 
 // ユーティリティ関数
