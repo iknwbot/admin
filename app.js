@@ -744,12 +744,53 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// モーダル表示関数
+function showModal(title, message, type = 'success') {
+  const modal = document.getElementById('messageModal');
+  const titleElement = document.getElementById('messageModalTitle');
+  const bodyElement = document.getElementById('messageModalBody');
+  
+  // アイコンと色を設定
+  let icon = '';
+  let headerClass = '';
+  
+  if (type === 'success') {
+    icon = '✅ ';
+    headerClass = 'text-success';
+  } else if (type === 'error') {
+    icon = '❌ ';
+    headerClass = 'text-danger';
+  } else if (type === 'warning') {
+    icon = '⚠️ ';
+    headerClass = 'text-warning';
+  } else {
+    icon = 'ℹ️ ';
+    headerClass = 'text-info';
+  }
+  
+  titleElement.textContent = title;
+  titleElement.className = 'modal-title ' + headerClass;
+  bodyElement.innerHTML = '<p class="mb-0">' + icon + escapeHtml(message) + '</p>';
+  
+  // モーダルを表示
+  const bootstrapModal = new bootstrap.Modal(modal);
+  bootstrapModal.show();
+}
+
 function showSuccess(message) {
-  alert('✅ ' + message);
+  showModal('成功', message, 'success');
 }
 
 function showError(message) {
-  alert('❌ ' + message);
+  showModal('エラー', message, 'error');
+}
+
+function showWarning(message) {
+  showModal('警告', message, 'warning');
+}
+
+function showInfo(message) {
+  showModal('情報', message, 'info');
 }
 
 // セッションタイムアウトチェック
@@ -1554,11 +1595,21 @@ async function saveSiteEdit(button, siteIndex) {
   const accountValue = accountInput.value.trim();
   
   try {
-    // WebサイトとBank Accountを更新
-    await Promise.all([
-      updateSite(siteName, 'webSite', websiteValue),
-      updateSite(siteName, 'transferDestination', accountValue)
-    ]);
+    // 更新が必要なフィールドのみ更新
+    const updatePromises = [];
+    
+    // 現在の値と比較して変更があった場合のみ更新
+    if (websiteDisplay.textContent !== websiteValue) {
+      updatePromises.push(updateSiteField(siteName, 'webSite', websiteValue));
+    }
+    
+    if (accountDisplay.textContent !== accountValue) {
+      updatePromises.push(updateSiteField(siteName, 'transferDestination', accountValue));
+    }
+    
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
+    }
     
     // 表示を更新
     websiteDisplay.textContent = websiteValue;
@@ -1578,8 +1629,29 @@ async function saveSiteEdit(button, siteIndex) {
     editBtn.classList.remove('d-none');
     saveBtn.classList.add('d-none');
     
-    showSuccess('拠点情報を保存しました');
+    // 単一の成功メッセージ
+    if (updatePromises.length > 0) {
+      showSuccess('拠点情報を更新しました');
+    } else {
+      showInfo('変更はありませんでした');
+    }
   } catch (error) {
     showError('保存に失敗しました: ' + error.message);
   }
+}
+
+// 拠点フィールド更新（メッセージ表示なし版）
+async function updateSiteField(siteName, field, value) {
+  const result = await apiRequest('updateSite', 'POST', {
+    action: 'updateSite',
+    siteName: siteName,
+    field: field,
+    value: value
+  });
+  
+  if (!result.success) {
+    throw new Error(result.error || '更新に失敗しました');
+  }
+  
+  return result;
 }
