@@ -384,7 +384,7 @@ function filterReports() {
         <td>${escapeHtml(report.nickname || report.userId)}</td>
         <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
         <td>${escapeHtml(report.eventType)}</td>
-        <td>大人:${report.adults} 子:${report.children}</td>
+        <td>大人:${report.adults} 子:${report.children} スタッフ:${report.staff}</td>
         <td>${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
         <td>
           <select class="form-select form-select-sm status-select" 
