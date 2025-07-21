@@ -568,112 +568,30 @@ async function loadLogs() {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      // 古い形式のログを新しい形式に変換
+      // GASから返されるログは既に正しい形式のため、変換は不要
+      // 古いログがある場合のみ簡単な変換を実行
       allLogs = allLogs.map((log, index) => {
-        console.log(`Processing log ${index}:`, log);
-        
-        // 新形式の場合はそのまま
-        if (log['タイムスタンプ'] || log.timestamp) {
-          console.log(`Log ${index} is already in new format`);
+        // 新形式（4列）の場合はそのまま
+        if (log['タイムスタンプ'] && log['種類'] && log['カテゴリ'] && log['詳細']) {
           return log;
         }
         
-        // 古い形式の場合は変換
+        // 古い形式がある場合の最低限の対応（通常は発生しない）
         const keys = Object.keys(log);
-        console.log(`Log ${index} keys:`, keys);
-        console.log(`Log ${index} values:`, Object.values(log));
-        
-        if (keys.length >= 2) {
-          // 実際のログ形式を分析
-          // 例: {"Mon May 05 2025 16:38:52 GMT+0900 (日本標準時)": "2025-06-17T08:36:41.303Z", "✅ いちいちいちパントリー : 活動報告が登録されました": "SUCCESS", "": "ステータス更新..."}
+        if (keys.length === 2 && !log['タイムスタンプ']) {
+          // 古い2列形式: [タイムスタンプ, メッセージ] の場合のみ変換
+          const timestamp = keys[0];
+          const message = log[timestamp];
           
-          let timestamp, type, category, details;
-          
-          // 1番目のキー: タイムスタンプっぽい文字列
-          const firstKey = keys[0];
-          const firstValue = log[firstKey];
-          
-          // 値が正しいタイムスタンプ（ISO形式）の場合を優先
-          if (firstValue && firstValue.includes('2025-06-17T')) {
-            timestamp = new Date(firstValue);
-          } else if (firstKey.includes('GMT') || firstKey.includes('2025')) {
-            // キー自体がタイムスタンプの場合（フォールバック）
-            timestamp = new Date(firstKey);
-          } else {
-            // その他の場合
-            timestamp = new Date(firstValue);
-          }
-          
-          // 古いログ形式の場合、2番目のキーが実際のログメッセージ
-          let typeKey = keys[1];
-          let typeValue = log[typeKey];
-          
-          // 3番目があれば詳細（新形式）、なければ2番目がメッセージ（旧形式）
-          let detailsValue = '';
-          if (keys.length >= 3 && keys[2]) {
-            // 新しい4列形式: タイムスタンプ, 種類, カテゴリ, 詳細
-            detailsValue = log[keys[2]]; // 3番目はカテゴリ
-            if (keys.length >= 4) {
-              details = log[keys[3]]; // 4番目が詳細
-            } else {
-              details = typeValue; // フォールバック
-            }
-          } else {
-            // 古い2列形式: タイムスタンプ, ログメッセージ
-            details = typeValue; // 2番目がログメッセージ全体
-            detailsValue = typeValue;
-          }
-          
-          // 種類を判定
-          if (typeValue === 'SUCCESS' || typeKey.includes('✅')) {
-            type = 'SUCCESS';
-          } else if (typeValue === 'ERROR' || typeKey.includes('❌')) {
-            type = 'ERROR';
-          } else if (typeValue === 'WARNING' || typeKey.includes('⚠')) {
-            type = 'WARNING';
-          } else {
-            type = 'INFO';
-          }
-          
-          // カテゴリを推測
-          const allText = (typeKey + ' ' + detailsValue + ' ' + details).toLowerCase();
-          if (allText.includes('活動報告') || allText.includes('report')) {
-            category = '活動報告';
-          } else if (allText.includes('寄付') || allText.includes('donation')) {
-            category = '寄付';
-          } else if (allText.includes('ユーザ') || allText.includes('user')) {
-            category = 'ユーザ';
-          } else if (allText.includes('振込') || allText.includes('transfer')) {
-            category = '振込確認';
-          } else if (allText.includes('ステータス更新') || allText.includes('管理')) {
-            category = '管理画面';
-          } else {
-            category = '管理画面';
-          }
-          
-          // 詳細メッセージを最終確認（空の場合のフォールバック）
-          if (!details || details === '') {
-            if (detailsValue && detailsValue !== '') {
-              details = detailsValue;
-            } else if (typeKey && typeKey !== '') {
-              details = typeKey;
-            } else {
-              details = 'ログメッセージ';
-            }
-          }
-          
-          const converted = {
-            'タイムスタンプ': timestamp,
-            '種類': type,
-            'カテゴリ': category,
-            '詳細': details
+          return {
+            'タイムスタンプ': new Date(timestamp),
+            '種類': 'INFO',
+            'カテゴリ': '管理画面',
+            '詳細': message
           };
-          
-          console.log(`Log ${index} converted:`, converted);
-          return converted;
         }
         
-        console.log(`Log ${index} could not be converted, returning as-is`);
+        // それ以外はそのまま返す
         return log;
       });
       
