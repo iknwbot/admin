@@ -384,11 +384,7 @@ function filterReports() {
         <td>${escapeHtml(report.nickname || report.userId)}</td>
         <td>${new Date(report.eventDate).toLocaleDateString('ja-JP')}</td>
         <td>${escapeHtml(report.eventType)}</td>
-<<<<<<< HEAD
-        <td>大人:${report.adults} 子:${report.children} スタッフ:${report.staff}</td>
-=======
         <td>大人:${report.adults} 子:${report.children} スタッフ:${report.staff || '未記録'}</td>
->>>>>>> c5b19b0 (Add 15,000円 subsidy cap to admin interface)
         <td>${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '-'}</td>
         <td>
           <select class="form-select form-select-sm status-select" 
@@ -435,10 +431,7 @@ window.showReportDetails = function(index) {
         <h6>参加者・金額</h6>
         <p><strong>大人:</strong> ${report.adults}人</p>
         <p><strong>子ども:</strong> ${report.children}人</p>
-<<<<<<< HEAD
-=======
         <p><strong>スタッフ:</strong> ${report.staff || 0}人</p>
->>>>>>> c5b19b0 (Add 15,000円 subsidy cap to admin interface)
         <p><strong>請求額:</strong> ${report.amount ? report.amount.toLocaleString().replace(/\\/g, '') + '円' : '未確定'}</p>
         <p><strong>ステータス:</strong> ${escapeHtml(report.processingFlag || '投稿まち')}</p>
       </div>
@@ -1232,17 +1225,11 @@ function updateTransferStatistics(filteredData) {
     siteData.reports.length === 0
   ).length;
   
-<<<<<<< HEAD
-  // 総振込金額の計算（全ステータスを含む）
-  const totalAmount = filteredData.reduce((total, siteData) => {
-    return total + siteData.reports
-=======
-  // 総振込金額の計算（全ステータスを含む、各団体15,000円上限適用）
-  const totalAmount = filteredData.reduce((total, siteData) => {
-    const siteTotal = siteData.reports
->>>>>>> c5b19b0 (Add 15,000円 subsidy cap to admin interface)
+  // 総振込金額を計算（15,000円上限を適用）
+  const totalAmount = filteredData.reduce((sum, siteData) => {
+    return sum + siteData.reports
       .filter(report => ['振込OK', '振込NG', '金額確定まち', '完了'].includes(report.processingFlag))
-      .reduce((sum, report) => {
+      .reduce((siteSum, report) => {
         // 金額を確実に数値として取得
         let amount = 0;
         if (report.amount !== undefined && report.amount !== null) {
@@ -1250,14 +1237,8 @@ function updateTransferStatistics(filteredData) {
           amount = parseFloat(amountStr);
           if (isNaN(amount)) amount = 0;
         }
-        return sum + amount;
+        return siteSum + amount;
       }, 0);
-<<<<<<< HEAD
-=======
-    
-    // 各団体に15,000円上限を適用
-    return total + Math.min(siteTotal, 15000);
->>>>>>> c5b19b0 (Add 15,000円 subsidy cap to admin interface)
   }, 0);
   
   document.getElementById('totalOrganizations').textContent = totalOrganizations;
@@ -1283,28 +1264,20 @@ function renderTransferTable(filteredData) {
       ['振込OK', '振込NG', '金額確定まち', '完了'].includes(report.processingFlag)
     );
     
-<<<<<<< HEAD
-    // 全ての対象レポートから合計金額を計算
-    const totalAmount = allRelevantReports.reduce((sum, report) => {
-=======
-    // 全ての対象レポートから合計金額を計算（15,000円上限適用）
-    const calculatedTotal = allRelevantReports.reduce((sum, report) => {
->>>>>>> c5b19b0 (Add 15,000円 subsidy cap to admin interface)
-      let amount = 0;
-      if (report.amount !== undefined && report.amount !== null) {
-        const amountStr = String(report.amount).replace(/[^0-9.-]/g, '');
-        amount = parseFloat(amountStr);
-        if (isNaN(amount)) amount = 0;
-      }
-      return sum + amount;
-    }, 0);
+    // 各拠点の総金額を計算（15,000円上限を適用）
+    const siteTotal = Math.min(
+      allRelevantReports.reduce((sum, report) => {
+        let amount = 0;
+        if (report.amount !== undefined && report.amount !== null) {
+          const amountStr = String(report.amount).replace(/[^0-9.-]/g, '');
+          amount = parseFloat(amountStr);
+          if (isNaN(amount)) amount = 0;
+        }
+        return sum + amount;
+      }, 0),
+      15000
+    );
     
-<<<<<<< HEAD
-=======
-    // 15,000円上限を適用
-    const totalAmount = Math.min(calculatedTotal, 15000);
-    
->>>>>>> c5b19b0 (Add 15,000円 subsidy cap to admin interface)
     // ボタンの状態を決定
     const hasTransferData = okReports.length > 0;
     const isCompleted = completedReports.length > 0 && okReports.length === 0;
@@ -1360,7 +1333,7 @@ function renderTransferTable(filteredData) {
               <div class="col-12 text-end">
                 <div class="mb-2">
                   <strong>合計振込金額: </strong>
-                  <span class="h5 text-primary">${Math.floor(totalAmount).toLocaleString()}円</span>
+                  <span class="h5 text-primary">${Math.floor(siteTotal).toLocaleString()}円</span>
                   <span class="ms-3"><strong>活動件数: </strong><span class="h5 text-info">${activityCount}件</span></span>
                 </div>
                 <div class="mb-2">
@@ -1369,7 +1342,7 @@ function renderTransferTable(filteredData) {
                 </div>
                 <div>
                   ${hasTransferData ? 
-                    `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${totalAmount}, ${activityCount})">
+                    `<button class="btn btn-success" onclick="showTransferConfirm('${escapeHtml(siteData.name)}', '${escapeHtml(siteData.account)}', ${siteTotal}, ${activityCount})">
                       <i class="bi bi-bank"></i> 振込する
                     </button>` :
                     isCompleted ?
@@ -2856,8 +2829,3 @@ window.createManualBackup = createManualBackup;
 window.setupAutoBackup = setupAutoBackup;
 window.downloadBackup = downloadBackup;
 window.confirmRestore = confirmRestore;
-<<<<<<< HEAD
-window.confirmDeleteBackup = confirmDeleteBackup;
-=======
-window.confirmDeleteBackup = confirmDeleteBackup;
->>>>>>> c5b19b0 (Add 15,000円 subsidy cap to admin interface)
