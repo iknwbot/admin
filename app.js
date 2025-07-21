@@ -575,66 +575,85 @@ async function loadLogs() {
           return log;
         }
         
+        // デバッグ用：各ログの内容を確認
+        console.log(`Log ${index}:`, log);
+        
         // 古い形式の変換処理
         const keys = Object.keys(log);
-        if (keys.length >= 2) {
+        console.log(`Log ${index} keys:`, keys);
+        
+        if (keys.length >= 1) {
+          // 実際のログ構造に基づく処理
+          // 例: {"Fri Jul 18 2025 13:15:27 GMT+0900": "2025-07-21T14:31:28.629Z", "✅ パントリー...": "SUCCESS", "": "詳細メッセージ"}
+          
+          const firstKey = keys[0]; // タイムスタンプキー
+          const firstValue = log[firstKey]; // タイムスタンプ値
+          
           let timestamp, type, category, details;
           
-          // 最初のキーをタイムスタンプとして解析
-          const timestampKey = keys[0];
-          const timestampValue = log[timestampKey];
-          
-          // タイムスタンプを決定（値がISOフォーマットの場合は値を、そうでなければキーを使用）
-          if (timestampValue && typeof timestampValue === 'string' && timestampValue.includes('T')) {
-            timestamp = new Date(timestampValue);
+          // タイムスタンプを決定
+          if (firstValue && typeof firstValue === 'string' && firstValue.includes('T')) {
+            timestamp = new Date(firstValue);
+          } else if (firstKey && (firstKey.includes('GMT') || firstKey.includes('2025'))) {
+            timestamp = new Date(firstKey);
           } else {
-            timestamp = new Date(timestampKey);
+            timestamp = new Date();
           }
           
-          // 2番目のキーから種類とメッセージを判定
-          if (keys.length >= 2) {
-            const messageKey = keys[1];
-            const messageValue = log[messageKey];
+          // 他のキーから情報を抽出
+          for (let i = 1; i < keys.length; i++) {
+            const key = keys[i];
+            const value = log[key];
             
-            // 種類を判定（メッセージ内容から）
-            if (messageKey.includes('✅') || messageValue === 'SUCCESS') {
+            console.log(`  Key ${i}: "${key}" = "${value}"`);
+            
+            // 種類の判定
+            if (value === 'SUCCESS' || value === 'ERROR' || value === 'WARNING' || value === 'INFO') {
+              type = value;
+              details = key; // キーがメッセージ
+            } else if (key.includes('✅')) {
               type = 'SUCCESS';
-            } else if (messageKey.includes('❌') || messageValue === 'ERROR') {
+              details = key;
+            } else if (key.includes('❌')) {
               type = 'ERROR';
-            } else if (messageKey.includes('⚠') || messageValue === 'WARNING') {
+              details = key;
+            } else if (key.includes('⚠')) {
               type = 'WARNING';
-            } else {
+              details = key;
+            } else if (key && key !== '') {
+              // その他のキーはメッセージとして扱う
+              if (!details) details = key;
+              if (!type) type = 'INFO';
+            } else if (value && value !== '' && !type) {
+              // 値がメッセージの場合
+              details = value;
               type = 'INFO';
             }
-            
-            // カテゴリを判定
-            const messageText = messageKey + ' ' + (messageValue || '');
-            if (messageText.includes('活動報告')) {
-              category = '活動報告';
-            } else if (messageText.includes('寄付')) {
-              category = '寄付報告';
-            } else if (messageText.includes('振込')) {
-              category = '振込確認';
-            } else if (messageText.includes('リマインド')) {
-              category = 'LINE通知';
-            } else {
-              category = '管理画面';
-            }
-            
-            // 詳細メッセージを決定
-            if (keys.length >= 3 && keys[2] && log[keys[2]]) {
-              details = log[keys[2]];
-            } else {
-              details = messageKey;
-            }
           }
           
-          return {
+          // カテゴリを判定
+          const allText = (details || '').toLowerCase();
+          if (allText.includes('活動報告') || allText.includes('report')) {
+            category = '活動報告';
+          } else if (allText.includes('寄付') || allText.includes('金銭寄付') || allText.includes('donation')) {
+            category = '寄付報告';
+          } else if (allText.includes('振込') || allText.includes('transfer')) {
+            category = '振込確認';
+          } else if (allText.includes('リマインド') || allText.includes('remind')) {
+            category = 'LINE通知';
+          } else {
+            category = '管理画面';
+          }
+          
+          const converted = {
             'タイムスタンプ': timestamp,
             '種類': type || 'INFO',
             'カテゴリ': category || '管理画面',
             '詳細': details || 'ログメッセージ'
           };
+          
+          console.log(`Log ${index} converted:`, converted);
+          return converted;
         }
         
         // それ以外はそのまま返す
