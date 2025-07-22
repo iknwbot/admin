@@ -562,7 +562,16 @@ async function loadLogs() {
       
       // デバッグ: ログデータの形式を確認
       console.log('Raw logs:', allLogs);
-      console.log('First log:', allLogs[0]);
+      const firstLog = allLogs[0];
+      console.log('First log:', firstLog);
+      if (firstLog) {
+        console.log('First log keys:', Object.keys(firstLog));
+        console.log('First log values:', Object.values(firstLog));
+        console.log('Looking for タイムスタンプ key:', firstLog['タイムスタンプ']);
+        console.log('Looking for 種類 key:', firstLog['種類']);
+        console.log('Looking for カテゴリ key:', firstLog['カテゴリ']);
+        console.log('Looking for 詳細 key:', firstLog['詳細']);
+      }
       
       // 最近30日のログのみを取得
       const thirtyDaysAgo = new Date();
