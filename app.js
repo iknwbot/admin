@@ -573,11 +573,12 @@ async function loadLogs() {
       
       console.log('All logs after conversion:', allLogs);
       
-      // 最近30日のログのみを取得
-      allLogs = allLogs.filter(log => {
-        const logDate = new Date(log['タイムスタンプ'] || log.timestamp);
-        return !isNaN(logDate) && logDate >= thirtyDaysAgo;
-      });
+      // 一時的に30日フィルタリングを無効化（ログ形式確認のため）
+      console.log('30日フィルタリングをスキップしています');
+      // allLogs = allLogs.filter(log => {
+      //   const logDate = new Date(log['タイムスタンプ'] || log.timestamp);
+      //   return !isNaN(logDate) && logDate >= thirtyDaysAgo;
+      // });
       
       console.log('Filtered logs:', allLogs);
       
