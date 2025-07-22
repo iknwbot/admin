@@ -577,8 +577,73 @@ async function loadLogs() {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      // GASから返されるログデータをそのまま使用（変換処理なし）
-      console.log('GASから取得した生ログデータ:', allLogs);
+      // 古い形式のログを新形式に変換
+      allLogs = allLogs.map((log, index) => {
+        // 既に新形式（4列）の場合はそのまま返す
+        if (log['タイムスタンプ'] && log['種類'] && log['カテゴリ'] && log['詳細']) {
+          return log;
+        }
+        
+        // 古い形式の場合（キーが日付文字列になっている）
+        const keys = Object.keys(log);
+        if (keys.length >= 2) {
+          // 1番目のキー：タイムスタンプ（例: "Fri Jul 18 2025 13:15:27 GMT+0900"）
+          // 1番目の値：ISO形式タイムスタンプ（例: "2025-07-22T06:54:32.363Z"）
+          const timestampKey = keys[0];
+          const timestampValue = log[timestampKey];
+          
+          // 2番目のキー：ログメッセージ（例: "✅ いちいちいちパントリー..."）
+          // 2番目の値：種類（例: "SUCCESS"）
+          const messageKey = keys[1] || '';
+          const typeValue = log[messageKey] || 'INFO';
+          
+          // 3番目のキー：空文字列の場合が多い
+          // 3番目の値：詳細メッセージ
+          const detailsKey = keys[2] || '';
+          const detailsValue = log[detailsKey] || messageKey; // 詳細がない場合はメッセージキーを使用
+          
+          // タイムスタンプの決定（ISO形式を優先）
+          let timestamp;
+          if (timestampValue && timestampValue.includes('T')) {
+            timestamp = new Date(timestampValue);
+          } else {
+            timestamp = new Date(timestampKey);
+          }
+          
+          // カテゴリの判定（メッセージ内容から推測）
+          let category = '管理画面';
+          const fullMessage = messageKey + ' ' + detailsValue;
+          if (fullMessage.includes('活動報告')) {
+            category = '活動報告';
+          } else if (fullMessage.includes('寄付') || fullMessage.includes('金銭寄付')) {
+            category = '寄付報告';
+          } else if (fullMessage.includes('振込')) {
+            category = '振込確認';
+          } else if (fullMessage.includes('リマインド')) {
+            category = 'LINE通知';
+          } else if (fullMessage.includes('ユーザ')) {
+            category = 'ユーザ管理';
+          }
+          
+          // 新形式のオブジェクトを返す
+          return {
+            'タイムスタンプ': timestamp,
+            '種類': typeValue,
+            'カテゴリ': category,
+            '詳細': detailsValue || messageKey
+          };
+        }
+        
+        // 変換できない場合はデフォルト値で返す
+        return {
+          'タイムスタンプ': new Date(),
+          '種類': 'INFO',
+          'カテゴリ': '管理画面',
+          '詳細': JSON.stringify(log)
+        };
+      });
+      
+      console.log('変換後のログデータ:', allLogs[0]);
       
       console.log('All logs after conversion:', allLogs);
       
